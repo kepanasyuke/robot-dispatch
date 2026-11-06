@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Диспетчер роботов — игра к robot-dispatch</title>
+<meta name="description" content="Мини-игра про диспетчеризацию: назначайте роботов на заказы, следите за зарядом и сроками.">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b1220;
+    --panel: #111a2e;
+    --panel-border: #22304a;
+    --card: #0f1830;
+    --text: #e9f0fb;
+    --muted: #8ea3c4;
+    --accent: #34d399;
+    --amber: #fbbf24;
+    --danger: #f87171;
+    --violet: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(1200px 600px at 20% -10%, #12203a 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    padding: 28px 16px 40px;
+  }
+  .shell { max-width: 1020px; margin: 0 auto; }
+  header h1 { margin: 0 0 8px; font-size: clamp(24px, 3.6vw, 34px); letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 70ch; line-height: 1.5; font-size: 15px; }
+  .hud {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch;
+    margin: 20px 0 12px;
+  }
+  .stat {
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+    padding: 8px 14px; min-width: 104px; display: flex; flex-direction: column; gap: 2px;
+  }
+  .stat .k { color: var(--muted); font-size: 12px; letter-spacing: .02em; }
+  .stat strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .stat.lives strong { color: var(--danger); }
+  .registry { display: flex; gap: 8px; margin: 0 0 12px; flex-wrap: wrap; }
+  .chip {
+    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 999px;
+    padding: 6px 12px; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center;
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+  .chip .bar { width: 56px; height: 6px; border-radius: 3px; background: #1b2740; overflow: hidden; }
+  .chip .bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+  .chip.low .bar span { background: var(--amber); }
+  .chip.dead .bar span { background: var(--danger); }
+  .actions { margin-left: auto; display: flex; gap: 8px; }
+  button {
+    font: inherit; color: var(--text); background: #16233b; border: 1px solid #2b3b57;
+    border-radius: 10px; padding: 9px 16px; cursor: pointer; transition: border-color .15s, transform .05s;
+  }
+  button:hover { border-color: var(--accent); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .stage { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--panel-border); background: var(--card); }
+  canvas { display: block; width: 100%; height: auto; touch-action: manipulation; }
+  .overlay {
+    position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center;
+    background: rgba(6, 11, 22, .82); backdrop-filter: blur(2px); padding: 24px;
+  }
+  .overlay[hidden] { display: none; }
+  .overlay h2 { margin: 0; font-size: 28px; }
+  .overlay p { margin: 0; color: var(--muted); }
+  footer { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  footer p { margin: 0 0 6px; }
+  kbd {
+    background: #16233b; border: 1px solid #2b3b57; border-bottom-width: 2px; border-radius: 6px;
+    padding: 1px 6px; font-family: Consolas, monospace; font-size: 12px; color: var(--text);
+  }
+  #selftest {
+    white-space: pre-wrap; background: #0d1526; border: 1px solid var(--panel-border);
+    border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-family: Consolas, monospace; font-size: 12px;
+  }
+  @media (max-width: 640px) {
+    body { padding: 18px 10px 30px; }
+    .stat { min-width: 84px; padding: 6px 10px; }
+    .stat strong { font-size: 18px; }
+    .actions { margin-left: 0; width: 100%; }
+    .actions button { flex: 1; }
+  }
+</style>
+</head>
+<body>
+<main class="shell">
+  <header>
+    <h1>Диспетчер роботов</h1>
+    <p>Склад присылает заказы. Назначайте свободных роботов, следите за зарядом и не давайте
+      заказам просрочиться. Если робот разрядится в пути — заказ потерян, как и в жизни.</p>
+  </header>
+
+  <section class="hud" aria-label="Показатели игры">
+    <div class="stat"><span class="k">Счёт</span><strong id="score">0</strong></div>
+    <div class="stat"><span class="k">Доставлено</span><strong id="delivered">0</strong></div>
+    <div class="stat"><span class="k">Просрочено</span><strong id="missed">0</strong></div>
+    <div class="stat lives"><span class="k">Жизни</span><strong id="lives">3</strong></div>
+    <div class="actions">
+      <button id="pause" type="button" aria-pressed="false">Пауза</button>
+      <button id="restart" type="button">Заново</button>
+    </div>
+  </section>
+
+  <div class="registry" id="registry" aria-label="Роботы"></div>
+
+  <div class="stage">
+    <canvas id="board" width="960" height="480" role="img"
+            aria-label="Склад: роботы, заказы и зона погрузки. Клик по заказу отправляет ближайшего робота."></canvas>
+    <div class="overlay" id="overlay" hidden>
+      <h2 id="overlay-title">Смена закончена</h2>
+      <p id="overlay-text"></p>
+      <button id="again" type="button">Ещё раз</button>
+    </div>
+  </div>
+
+  <footer>
+    <p>Клик по заказу — ближайший свободный робот. <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> — отправить
+      выбранному роботу, <kbd>пробел</kbd> — пауза, <kbd>R</kbd> — заново.</p>
+    <p>Игра к проекту <a href="https://github.com/kepanasyuke/robot-dispatch" style="color: var(--accent)">robot-dispatch</a>:
+      та же логика — задача, свободный робот, отказ и повтор.</p>
+  </footer>
+  <pre id="selftest" hidden></pre>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+
+  const COLORS = {
+    bg: '#0b1220',
+    grid: '#141f33',
+    shelf: '#16233b',
+    shelfEdge: '#22304a',
+    text: '#e9f0fb',
+    muted: '#8ea3c4',
+    accent: '#34d399',
+    amber: '#fbbf24',
+    danger: '#f87171',
+    violet: '#a78bfa',
+    drop: '#7c5cff',
+  };
+
+  const ROBOT_R = 17;
+  const SPEED = 170;
+  const DRAIN = 2.4;
+  const CHARGE = 26;
+  const LOW_BATTERY = 25;
+  const CHARGE_TO = 85;
+  const DROP = { x: W - 110, y: H - 62, w: 170, h: 96 };
+  const SPAWN_POINTS = [
+    { x: 170, y: 130 }, { x: 320, y: 170 }, { x: 470, y: 120 },
+    { x: 620, y: 170 }, { x: 760, y: 120 }, { x: 250, y: 260 },
+    { x: 400, y: 300 }, { x: 560, y: 250 }, { x: 720, y: 300 },
+    { x: 180, y: 380 },
+  ];
+
+  const hud = {
+    score: document.getElementById('score'),
+    delivered: document.getElementById('delivered'),
+    missed: document.getElementById('missed'),
+    lives: document.getElementById('lives'),
+    pause: document.getElementById('pause'),
+    restart: document.getElementById('restart'),
+    overlay: document.getElementById('overlay'),
+    overlayTitle: document.getElementById('overlay-title'),
+    overlayText: document.getElementById('overlay-text'),
+    again: document.getElementById('again'),
+    registry: document.getElementById('registry'),
+    selftest: document.getElementById('selftest'),
+  };
+
+  const isSelfTest = new URLSearchParams(location.search).has('selftest');
+
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  function mulberry32(seed) {
+    let state = seed >>> 0;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  let random = mulberry32(7);
+  let game = null;
+
+  // ------------------------------------------------------------------ model
+
+  function createGame(seed) {
+    random = mulberry32(seed);
+    return {
+      seed,
+      robots: [
+        { id: 0, name: 'R1', x: 110, y: 230, battery: 100, state: 'idle', order: null, target: null, timer: 0 },
+        { id: 1, name: 'R2', x: 110, y: 330, battery: 100, state: 'idle', order: null, target: null, timer: 0 },
+        { id: 2, name: 'R3', x: 110, y: 430, battery: 100, state: 'idle', order: null, target: null, timer: 0 },
+      ],
+      orders: [],
+      floats: [],
+      score: 0,
+      delivered: 0,
+      missed: 0,
+      lives: 3,
+      combo: 0,
+      comboTimer: 0,
+      elapsed: 0,
+      spawnTimer: 1.4,
+      spawnInterval: 3.4,
+      paused: false,
+      over: false,
+      autoSpawn: true,
+      message: '',
+      messageTimer: 0,
+      nextId: 1,
+    };
+  }
+
+  function spawnOrder() {
+    const point = SPAWN_POINTS[Math.floor(random() * SPAWN_POINTS.length)];
+    const ttl = Math.max(11, 20 - game.elapsed * 0.12);
+    game.orders.push({
+      id: game.nextId++,
+      x: point.x + (random() - 0.5) * 26,
+      y: point.y + (random() - 0.5) * 20,
+      ttl,
+      born: game.elapsed,
+      robot: null,
+    });
+    return game.orders[game.orders.length - 1];
+  }
+
+  function availableRobots() {
+    return game.robots.filter((robot) => robot.state === 'idle' && robot.battery > LOW_BATTERY);
+  }
+
+  function pickRobot(order) {
+    const free = availableRobots();
+    if (!free.length) return null;
+    return free.reduce((best, robot) => (dist(robot, order) < dist(best, order) ? robot : best));
+  }
+
+  function dispatch(order, robot) {
+    if (!robot || robot.state !== 'idle' || robot.battery <= LOW_BATTERY) return null;
+    if (order.robot !== null) return null;
+    robot.order = order;
+    robot.state = 'toPickup';
+    robot.target = { x: order.x, y: order.y };
+    order.robot = robot.id;
+    return robot;
+  }
+
+  function dispatchToNearest(order) {
+    const robot = pickRobot(order);
+    if (!robot) {
+      flash('нет свободных роботов');
+      return null;
+    }
+    return dispatch(order, robot);
+  }
+
+  function flash(text) {
+    game.message = text;
+    game.messageTimer = 1.6;
+  }
+
+  function addFloat(x, y, text, color) {
+    game.floats.push({ x, y, text, color, life: 1 });
+  }
+
+  function releaseRobot(robot) {
+    if (robot.order) {
+      robot.order.robot = null;
+      robot.order = null;
+    }
+    if (robot.state !== 'charging' && robot.state !== 'dead') {
+      robot.state = 'idle';
+    }
+    robot.target = null;
+  }
+
+  function expireOrder(order) {
+    game.missed += 1;
+    game.lives -= 1;
+    game.combo = 0;
+    game.orders = game.orders.filter((item) => item !== order);
+    if (order.robot !== null) {
+      const robot = game.robots[order.robot];
+      if (robot) {
+        robot.order = null;
+        if (robot.state === 'toPickup' || robot.state === 'toDrop') {
+          robot.state = 'idle';
+          robot.target = null;
+        }
+      }
+    }
+    addFloat(order.x, order.y, '−1 жизнь', COLORS.danger);
+    if (game.lives <= 0) endGame();
+  }
+
+  function deliverOrder(robot) {
+    const order = robot.order;
+    if (!order) return;
+    const remaining = Math.max(0, order.ttl - (game.elapsed - order.born));
+    const bonus = Math.round(remaining * 2);
+    game.combo = clamp(game.combo + 1, 1, 3);
+    game.comboTimer = 5;
+    const points = Math.round((10 + bonus) * (1 + (game.combo - 1) * 0.5));
+    game.score += points;
+    game.delivered += 1;
+    addFloat(DROP.x, DROP.y - 44, `+${points}`, COLORS.accent);
+    robot.order = null;
+    robot.state = 'idle';
+    robot.target = null;
+    robot.battery = Math.max(0, robot.battery - 3);
+    robot.x = DROP.x - 120;
+    robot.y = DROP.y - 4;
+    game.orders = game.orders.filter((item) => item !== order);
+  }
+
+  function endGame() {
+    game.over = true;
+    hud.overlay.hidden = false;
+    hud.overlayTitle.textContent = 'Смена закончена';
+    hud.overlayText.textContent = `Счёт ${game.score} · доставлено ${game.delivered} · просрочено ${game.missed}`;
+    window.__game = game;
+  }
+
+  function stepRobot(robot, dt) {
+    if (robot.state === 'dead') {
+      robot.timer -= dt;
+      if (robot.timer <= 0) {
+        robot.state = 'charging';
+        robot.x = DROP.x - 132;
+        robot.y = DROP.y - 8;
+        robot.battery = 30;
+      }
+      return;
+    }
+
+    if (robot.state === 'idle' && robot.battery < LOW_BATTERY) {
+      robot.state = 'toCharger';
+      robot.target = { x: DROP.x - 132, y: DROP.y - 8 };
+      flash(`${robot.name}: низкий заряд, едет заряжаться`);
+      return;
+    }
+
+    if (robot.state === 'charging') {
+      robot.battery = Math.min(100, robot.battery + CHARGE * dt);
+      if (robot.battery >= CHARGE_TO) robot.state = 'idle';
+      return;
+    }
+
+    if (!robot.target) return;
+
+    const dx = robot.target.x - robot.x;
+    const dy = robot.target.y - robot.y;
+    const distance = Math.hypot(dx, dy);
+    const stepSize = SPEED * dt;
+
+    robot.battery = Math.max(0, robot.battery - DRAIN * dt);
+    if (robot.battery <= 0) {
+      robot.state = 'dead';
+      robot.timer = 5;
+      if (robot.order) expireOrder(robot.order);
+      flash(`${robot.name}: разрядился в пути`);
+      return;
+    }
+
+    if (distance <= stepSize) {
+      robot.x = robot.target.x;
+      robot.y = robot.target.y;
+      robot.target = null;
+      if (robot.state === 'toPickup' && robot.order) {
+        robot.state = 'toDrop';
+        robot.target = { x: DROP.x, y: DROP.y };
+      } else if (robot.state === 'toDrop') {
+        deliverOrder(robot);
+      } else if (robot.state === 'toCharger') {
+        robot.state = 'charging';
+      }
+      return;
+    }
+
+    robot.x += (dx / distance) * stepSize;
+    robot.y += (dy / distance) * stepSize;
+  }
+
+  function update(dt) {
+    if (!game || game.paused || game.over) return;
+
+    game.elapsed += dt;
+    game.messageTimer = Math.max(0, game.messageTimer - dt);
+
+    if (game.comboTimer > 0) {
+      game.comboTimer -= dt;
+      if (game.comboTimer <= 0) game.combo = 0;
+    }
+
+    if (game.autoSpawn) {
+      game.spawnTimer -= dt;
+      if (game.spawnTimer <= 0) {
+        spawnOrder();
+        game.spawnInterval = Math.max(1.6, 3.4 - game.elapsed * 0.025);
+        game.spawnTimer = game.spawnInterval;
+      }
+    }
+
+    for (const order of [...game.orders]) {
+      if (game.elapsed - order.born > order.ttl) expireOrder(order);
+    }
+
+    for (const robot of game.robots) stepRobot(robot, dt);
+
+    for (const item of game.floats) {
+      item.life -= dt * 0.9;
+      item.y -= 26 * dt;
+    }
+    game.floats = game.floats.filter((item) => item.life > 0);
+  }
+
+  // ----------------------------------------------------------------- drawing
+
+  function roundedRect(x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(x, y, w, h, r);
+      return;
+    }
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawBackground() {
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 60) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, H);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= H; y += 60) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(W, y + 0.5);
+      ctx.stroke();
+    }
+
+    const shelves = [
+      [60, 80, 200, 18], [300, 120, 160, 18], [500, 90, 180, 18],
+      [60, 300, 120, 18], [620, 220, 150, 18], [300, 400, 140, 18],
+    ];
+    ctx.fillStyle = COLORS.shelf;
+    for (const [x, y, w, h] of shelves) {
+      roundedRect(x, y, w, h, 6);
+      ctx.fill();
+    }
+  }
+
+  function drawDropZone() {
+    ctx.save();
+    ctx.strokeStyle = COLORS.drop;
+    ctx.fillStyle = 'rgba(124, 92, 255, 0.12)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 6]);
+    roundedRect(DROP.x - DROP.w / 2, DROP.y - DROP.h / 2, DROP.w, DROP.h, 14);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = COLORS.violet;
+    ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('погрузка', DROP.x, DROP.y + 4);
+    ctx.textAlign = 'left';
+  }
+
+  function drawOrder(order) {
+    const pulse = 1 + Math.sin(game.elapsed * 6 + order.id) * 0.12;
+    const remaining = clamp(1 - (game.elapsed - order.born) / order.ttl, 0, 1);
+    const assigned = order.robot !== null;
+    const color = assigned ? COLORS.accent : remaining > 0.35 ? COLORS.amber : COLORS.danger;
+
+    ctx.save();
+    ctx.globalAlpha = assigned ? 0.75 : 1;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(order.x, order.y, 13 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(order.x, order.y, 21, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining);
+    ctx.stroke();
+
+    ctx.fillStyle = '#0b1220';
+    ctx.beginPath();
+    ctx.arc(order.x, order.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRobot(robot) {
+    const battery = clamp(robot.battery, 0, 100) / 100;
+    const color = robot.state === 'dead' ? COLORS.danger
+      : robot.battery < LOW_BATTERY ? COLORS.amber
+      : robot.state === 'idle' ? COLORS.muted
+      : COLORS.accent;
+
+    if (robot.state === 'charging') {
+      ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(robot.x, robot.y, ROBOT_R + 9, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.translate(robot.x, robot.y);
+
+    ctx.fillStyle = robot.state === 'dead' ? '#2a1420' : '#16233b';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, ROBOT_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(-5, -3, 3, 0, Math.PI * 2);
+    ctx.arc(5, -3, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 2, 6, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+
+    if (robot.order) {
+      ctx.fillStyle = COLORS.amber;
+      roundedRect(-6, -ROBOT_R - 14, 12, 10, 3);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(robot.x, robot.y, ROBOT_R + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * battery);
+    ctx.stroke();
+
+    ctx.fillStyle = COLORS.muted;
+    ctx.font = '600 11px Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(robot.name, robot.x, Math.min(robot.y + ROBOT_R + 20, H - 6));
+    ctx.textAlign = 'left';
+
+    if (robot.state === 'dead') {
+      ctx.strokeStyle = COLORS.danger;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(robot.x - 8, robot.y - 8);
+      ctx.lineTo(robot.x + 8, robot.y + 8);
+      ctx.moveTo(robot.x + 8, robot.y - 8);
+      ctx.lineTo(robot.x - 8, robot.y + 8);
+      ctx.stroke();
+    }
+  }
+
+  function draw() {
+    if (!game) return;
+    drawBackground();
+    drawDropZone();
+    for (const order of game.orders) {
+      const carrier = order.robot === null ? null : game.robots[order.robot];
+      if (!carrier || carrier.state === 'toPickup') drawOrder(order);
+    }
+
+    ctx.strokeStyle = 'rgba(52, 211, 153, 0.18)';
+    ctx.lineWidth = 1.5;
+    for (const robot of game.robots) {
+      if (!robot.target) continue;
+      ctx.beginPath();
+      ctx.moveTo(robot.x, robot.y);
+      ctx.lineTo(robot.target.x, robot.target.y);
+      ctx.stroke();
+    }
+
+    for (const robot of game.robots) drawRobot(robot);
+
+    for (const item of game.floats) {
+      ctx.globalAlpha = clamp(item.life, 0, 1);
+      ctx.fillStyle = item.color;
+      ctx.font = '700 15px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.text, item.x, item.y);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
+
+    if (game.messageTimer > 0 && game.message) {
+      ctx.fillStyle = 'rgba(11, 18, 32, 0.85)';
+      const width = ctx.measureText(game.message).width + 28;
+      roundedRect(W / 2 - width / 2, 14, width, 30, 10);
+      ctx.fill();
+      ctx.fillStyle = COLORS.amber;
+      ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(game.message, W / 2, 34);
+      ctx.textAlign = 'left';
+    }
+
+    if (game.paused && !game.over) {
+      ctx.fillStyle = 'rgba(6, 11, 22, 0.6)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = COLORS.text;
+      ctx.font = '700 26px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Пауза', W / 2, H / 2);
+      ctx.textAlign = 'left';
+    }
+  }
+
+  // --------------------------------------------------------------------- hud
+
+  function updateHud() {
+    hud.score.textContent = String(game.score);
+    hud.delivered.textContent = String(game.delivered);
+    hud.missed.textContent = String(game.missed);
+    hud.lives.textContent = String(game.lives);
+    hud.pause.textContent = game.paused ? 'Продолжить' : 'Пауза';
+    hud.pause.setAttribute('aria-pressed', String(game.paused));
+
+    hud.registry.textContent = '';
+    for (const robot of game.robots) {
+      const chip = document.createElement('div');
+      const low = robot.battery < LOW_BATTERY;
+      chip.className = `chip${low ? ' low' : ''}${robot.state === 'dead' ? ' dead' : ''}`;
+      const label = robot.state === 'dead' ? 'разряжен'
+        : robot.state === 'charging' ? 'зарядка'
+        : robot.order ? 'в пути'
+        : 'свободен';
+      chip.innerHTML = `<b>${robot.name}</b> ${label} <span class="bar"><span style="width:${Math.round(robot.battery)}%"></span></span> ${Math.round(robot.battery)}%`;
+      hud.registry.appendChild(chip);
+    }
+  }
+
+  // ------------------------------------------------------------------- input
+
+  function canvasPoint(event) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) * (W / rect.width),
+      y: (event.clientY - rect.top) * (H / rect.height),
+    };
+  }
+
+  function nearestOrder(point) {
+    let best = null;
+    let bestDistance = 40;
+    for (const order of game.orders) {
+      if (order.robot !== null) continue;
+      const distance = dist(point, order);
+      if (distance < bestDistance) {
+        best = order;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  canvas.addEventListener('pointerdown', (event) => {
+    if (!game || game.paused || game.over) return;
+    const point = canvasPoint(event);
+    const order = nearestOrder(point);
+    if (order) dispatchToNearest(order);
+  });
+
+  window.addEventListener('keydown', (event) => {
+    if (!game) return;
+    if (event.code === 'Space') {
+      event.preventDefault();
+      togglePause();
+      return;
+    }
+    if (event.key === 'r' || event.key === 'R' || event.key === 'к' || event.key === 'К') {
+      restart();
+      return;
+    }
+    const index = Number(event.key) - 1;
+    if (index >= 0 && index < game.robots.length) {
+      const robot = game.robots[index];
+      const order = game.orders.find((item) => item.robot === null);
+      if (order && robot.state === 'idle') {
+        dispatch(order, robot);
+      } else if (!order) {
+        flash('все заказы уже в работе');
+      } else {
+        flash(`${robot.name} занят`);
+      }
+    }
+  });
+
+  function togglePause() {
+    if (game.over) return;
+    game.paused = !game.paused;
+    updateHud();
+  }
+
+  function restart() {
+    game = createGame((Date.now() % 100000) + 1);
+    hud.overlay.hidden = true;
+    updateHud();
+  }
+
+  hud.pause.addEventListener('click', togglePause);
+  hud.restart.addEventListener('click', restart);
+  hud.again.addEventListener('click', restart);
+
+  // -------------------------------------------------------------------- loop
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = clamp((now - last) / 1000, 0, 0.05);
+    last = now;
+    update(dt);
+    draw();
+    updateHud();
+    requestAnimationFrame(frame);
+  }
+
+  // --------------------------------------------------------------- self-test
+
+  function stepFor(seconds, dt = 0.05) {
+    for (let time = 0; time < seconds; time += dt) update(dt);
+  }
+
+  function selfTest() {
+    const results = [];
+    const check = (name, ok, info = '') => results.push({ name, ok: Boolean(ok), info });
+
+    game = createGame(1);
+    game.autoSpawn = false;
+    const order = spawnOrder();
+    order.ttl = 60;
+    const robot = dispatchToNearest(order);
+    check('робот назначен на заказ', robot !== null, robot ? robot.name : 'нет робота');
+    stepFor(20);
+    check('заказ доставлен', game.delivered === 1, `delivered=${game.delivered}`);
+    check('счёт начислен', game.score > 0, `score=${game.score}`);
+    check('робот освободился', robot && robot.state === 'idle', robot ? robot.state : '—');
+
+    game = createGame(2);
+    game.autoSpawn = false;
+    spawnOrder().ttl = 1;
+    stepFor(2);
+    check('просрочка списана', game.missed === 1 && game.lives === 2, `missed=${game.missed}, lives=${game.lives}`);
+
+    game = createGame(3);
+    game.autoSpawn = false;
+    game.robots[0].battery = 12;
+    stepFor(20);
+    check('робот уехал заряжаться', game.robots[0].battery > LOW_BATTERY, `battery=${game.robots[0].battery.toFixed(1)}`);
+
+    game = createGame(4);
+    game.autoSpawn = false;
+    game.robots.forEach((item) => { item.state = 'charging'; });
+    const stranded = spawnOrder();
+    check('без свободных роботов — отказ', dispatchToNearest(stranded) === null);
+
+    game = createGame(5);
+    game.autoSpawn = false;
+    game.lives = 1;
+    spawnOrder().ttl = 0.5;
+    stepFor(2);
+    check('при нуле жизней игра завершается', game.over === true, `over=${game.over}`);
+
+    const failed = results.filter((item) => !item.ok);
+    hud.selftest.hidden = false;
+    hud.selftest.textContent = `${failed.length ? 'SELFTEST FAIL' : 'SELFTEST OK'}\n` +
+      results.map((item) => `${item.ok ? 'ok  ' : 'FAIL'} ${item.name} ${item.info}`).join('\n');
+    window.__selftest = { ok: failed.length === 0, results };
+  }
+
+  const demoSeconds = Number(new URLSearchParams(location.search).get('demo') || 0);
+
+  game = createGame(7);
+  if (isSelfTest) {
+    selfTest();
+    return;
+  }
+  if (demoSeconds > 0) {
+    for (let time = 0; time < demoSeconds; time += 0.1) {
+      update(0.1);
+      const waiting = game.orders.find((order) => order.robot === null);
+      if (waiting) dispatchToNearest(waiting);
+    }
+  }
+  updateHud();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

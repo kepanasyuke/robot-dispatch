@@ -37,6 +37,21 @@
 
 Суммарно: **165 тестов**, `ruff` и `mypy` без замечаний, CI на каждый push.
 
+## Игра
+
+<p align="center">
+  <a href="https://kepanasyuke.github.io/robot-dispatch/game/">
+    <img src="docs/game/preview.png" width="880" alt="Игра «Диспетчер роботов»: склад, роботы, заказы и зона погрузки">
+  </a>
+</p>
+
+«Диспетчер роботов» — мини-игра на ту же тему: заказы приходят на склад, нужно назначать свободных
+роботов, следить за зарядом и не давать заказам просрочиться. Робот, разрядившийся в пути, теряет
+заказ — ровно как истекающий lease в сервисе.
+
+Играть: [kepanasyuke.github.io/robot-dispatch/game](https://kepanasyuke.github.io/robot-dispatch/game/) ·
+исходник: `docs/game/index.html` — один файл, без зависимостей, сети и сборки.
+
 ## Быстрый старт
 
 ```bash
