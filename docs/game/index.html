@@ -71,6 +71,7 @@
   .overlay p { margin: 0; color: var(--muted); }
   footer { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
   footer p { margin: 0 0 6px; }
+  footer strong { color: var(--text); font-weight: 600; }
   kbd {
     background: #16233b; border: 1px solid #2b3b57; border-bottom-width: 2px; border-radius: 6px;
     padding: 1px 6px; font-family: Consolas, monospace; font-size: 12px; color: var(--text);
@@ -79,6 +80,14 @@
     white-space: pre-wrap; background: #0d1526; border: 1px solid var(--panel-border);
     border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-family: Consolas, monospace; font-size: 12px;
   }
+  body.embed { padding: 0; background: var(--bg); min-height: 0; }
+  body.embed .shell { max-width: none; }
+  body.embed header,
+  body.embed .hud,
+  body.embed .registry,
+  body.embed footer,
+  body.embed #selftest { display: none; }
+  body.embed .stage { border: 0; border-radius: 0; }
   @media (max-width: 640px) {
     body { padding: 18px 10px 30px; }
     .stat { min-width: 84px; padding: 6px 10px; }
@@ -93,7 +102,7 @@
   <header>
     <h1>Диспетчер роботов</h1>
     <p>Склад присылает заказы. Назначайте свободных роботов, следите за зарядом и не давайте
-      заказам просрочиться. Если робот разрядится в пути — заказ потерян, как и в жизни.</p>
+      заказам просрочиться. Если робот не довёз заказ — задача вернётся в очередь, но не бесконечно.</p>
   </header>
 
   <section class="hud" aria-label="Показатели игры">
@@ -120,6 +129,8 @@
   </div>
 
   <footer>
+    <p><strong>Правило:</strong> заказ, потерянный роботом, возвращается в очередь — до 3 попыток,
+      затем −1 жизнь. Заказ, который никто не взял, сгорает сразу.</p>
     <p>Клик по заказу — ближайший свободный робот. <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> — отправить
       выбранному роботу, <kbd>пробел</kbd> — пауза, <kbd>R</kbd> — заново.</p>
     <p>Игра к проекту <a href="https://github.com/kepanasyuke/robot-dispatch" style="color: var(--accent)">robot-dispatch</a>:
@@ -131,6 +142,12 @@
 <script>
 (() => {
   'use strict';
+
+  const params = new URLSearchParams(location.search);
+  const isSelfTest = params.has('selftest');
+  const isEmbed = params.has('embed');
+
+  if (isEmbed) document.body.classList.add('embed');
 
   const canvas = document.getElementById('board');
   const ctx = canvas.getContext('2d');
@@ -157,6 +174,7 @@
   const CHARGE = 26;
   const LOW_BATTERY = 25;
   const CHARGE_TO = 85;
+  const MAX_ATTEMPTS = 3;
   const DROP = { x: W - 110, y: H - 62, w: 170, h: 96 };
   const SPAWN_POINTS = [
     { x: 170, y: 130 }, { x: 320, y: 170 }, { x: 470, y: 120 },
@@ -179,8 +197,6 @@
     registry: document.getElementById('registry'),
     selftest: document.getElementById('selftest'),
   };
-
-  const isSelfTest = new URLSearchParams(location.search).has('selftest');
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -206,12 +222,13 @@
     return {
       seed,
       robots: [
-        { id: 0, name: 'R1', x: 110, y: 230, battery: 100, state: 'idle', order: null, target: null, timer: 0 },
-        { id: 1, name: 'R2', x: 110, y: 330, battery: 100, state: 'idle', order: null, target: null, timer: 0 },
-        { id: 2, name: 'R3', x: 110, y: 430, battery: 100, state: 'idle', order: null, target: null, timer: 0 },
+        { id: 0, name: 'R1', x: 110, y: 230, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
+        { id: 1, name: 'R2', x: 110, y: 330, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
+        { id: 2, name: 'R3', x: 110, y: 430, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
       ],
       orders: [],
       floats: [],
+      particles: [],
       score: 0,
       delivered: 0,
       missed: 0,
@@ -240,6 +257,7 @@
       ttl,
       born: game.elapsed,
       robot: null,
+      attempts: 1,
     });
     return game.orders[game.orders.length - 1];
   }
@@ -275,41 +293,59 @@
 
   function flash(text) {
     game.message = text;
-    game.messageTimer = 1.6;
+    game.messageTimer = 1.8;
   }
 
   function addFloat(x, y, text, color) {
     game.floats.push({ x, y, text, color, life: 1 });
   }
 
-  function releaseRobot(robot) {
-    if (robot.order) {
-      robot.order.robot = null;
-      robot.order = null;
+  function burst(x, y, color, count) {
+    for (let i = 0; i < count; i += 1) {
+      const angle = random() * Math.PI * 2;
+      const speed = 40 + random() * 100;
+      game.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 50,
+        life: 0.6 + random() * 0.3,
+        size: 2 + random() * 3,
+        color,
+      });
     }
-    if (robot.state !== 'charging' && robot.state !== 'dead') {
-      robot.state = 'idle';
-    }
-    robot.target = null;
   }
 
-  function expireOrder(order) {
+  function lostOrder(order) {
+    game.orders = game.orders.filter((item) => item !== order);
     game.missed += 1;
     game.lives -= 1;
     game.combo = 0;
-    game.orders = game.orders.filter((item) => item !== order);
-    if (order.robot !== null) {
-      const robot = game.robots[order.robot];
-      if (robot) {
-        robot.order = null;
-        if (robot.state === 'toPickup' || robot.state === 'toDrop') {
-          robot.state = 'idle';
-          robot.target = null;
-        }
+    addFloat(order.x, order.y - 22, '−1 жизнь', COLORS.danger);
+    burst(order.x, order.y, COLORS.danger, 10);
+    if (game.lives <= 0) endGame();
+  }
+
+  function failAttempt(order) {
+    const robot = order.robot === null ? null : game.robots[order.robot];
+    if (robot) {
+      robot.order = null;
+      if (robot.state === 'toPickup' || robot.state === 'toDrop') {
+        robot.state = 'idle';
+        robot.target = null;
       }
     }
-    addFloat(order.x, order.y, '−1 жизнь', COLORS.danger);
-    if (game.lives <= 0) endGame();
+    order.robot = null;
+
+    if (order.attempts >= MAX_ATTEMPTS) {
+      lostOrder(order);
+      return;
+    }
+    order.attempts += 1;
+    order.born = game.elapsed;
+    order.ttl = Math.max(9, order.ttl * 0.85);
+    addFloat(order.x, order.y - 34, `попытка ${order.attempts}/${MAX_ATTEMPTS}`, COLORS.amber);
+    flash(`повторная постановка: попытка ${order.attempts}/${MAX_ATTEMPTS}`);
   }
 
   function deliverOrder(robot) {
@@ -323,6 +359,7 @@
     game.score += points;
     game.delivered += 1;
     addFloat(DROP.x, DROP.y - 44, `+${points}`, COLORS.accent);
+    burst(DROP.x, DROP.y - 6, COLORS.accent, 14);
     robot.order = null;
     robot.state = 'idle';
     robot.target = null;
@@ -337,7 +374,6 @@
     hud.overlay.hidden = false;
     hud.overlayTitle.textContent = 'Смена закончена';
     hud.overlayText.textContent = `Счёт ${game.score} · доставлено ${game.delivered} · просрочено ${game.missed}`;
-    window.__game = game;
   }
 
   function stepRobot(robot, dt) {
@@ -372,11 +408,14 @@
     const distance = Math.hypot(dx, dy);
     const stepSize = SPEED * dt;
 
+    if (distance > 0.001) robot.heading = Math.atan2(dy, dx);
     robot.battery = Math.max(0, robot.battery - DRAIN * dt);
+
     if (robot.battery <= 0) {
       robot.state = 'dead';
       robot.timer = 5;
-      if (robot.order) expireOrder(robot.order);
+      burst(robot.x, robot.y, COLORS.danger, 12);
+      if (robot.order) failAttempt(robot.order);
       flash(`${robot.name}: разрядился в пути`);
       return;
     }
@@ -388,6 +427,7 @@
       if (robot.state === 'toPickup' && robot.order) {
         robot.state = 'toDrop';
         robot.target = { x: DROP.x, y: DROP.y };
+        burst(robot.x, robot.y, COLORS.amber, 6);
       } else if (robot.state === 'toDrop') {
         deliverOrder(robot);
       } else if (robot.state === 'toCharger') {
@@ -421,7 +461,9 @@
     }
 
     for (const order of [...game.orders]) {
-      if (game.elapsed - order.born > order.ttl) expireOrder(order);
+      if (game.elapsed - order.born <= order.ttl) continue;
+      if (order.robot === null) lostOrder(order);
+      else failAttempt(order);
     }
 
     for (const robot of game.robots) stepRobot(robot, dt);
@@ -431,6 +473,14 @@
       item.y -= 26 * dt;
     }
     game.floats = game.floats.filter((item) => item.life > 0);
+
+    for (const particle of game.particles) {
+      particle.vy += 180 * dt;
+      particle.x += particle.vx * dt;
+      particle.y += particle.vy * dt;
+      particle.life -= dt;
+    }
+    game.particles = game.particles.filter((particle) => particle.life > 0);
   }
 
   // ----------------------------------------------------------------- drawing
@@ -447,6 +497,40 @@
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+
+  function drawCube(x, y, size, top, left, right, alpha = 1) {
+    const half = size * 0.5;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y - half);
+    ctx.lineTo(x + size, y);
+    ctx.lineTo(x, y + half);
+    ctx.lineTo(x - size, y);
+    ctx.closePath();
+    ctx.fillStyle = top;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x - size, y);
+    ctx.lineTo(x, y + half);
+    ctx.lineTo(x, y + half + size);
+    ctx.lineTo(x - size, y + size);
+    ctx.closePath();
+    ctx.fillStyle = left;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(x + size, y);
+    ctx.lineTo(x, y + half);
+    ctx.lineTo(x, y + half + size);
+    ctx.lineTo(x + size, y + size);
+    ctx.closePath();
+    ctx.fillStyle = right;
+    ctx.fill();
+    ctx.restore();
   }
 
   function drawBackground() {
@@ -498,32 +582,45 @@
   }
 
   function drawOrder(order) {
-    const pulse = 1 + Math.sin(game.elapsed * 6 + order.id) * 0.12;
+    const carrier = order.robot === null ? null : game.robots[order.robot];
+    if (carrier && carrier.state === 'toDrop') return;
+
+    const pulse = 1 + Math.sin(game.elapsed * 5 + order.id) * 0.08;
     const remaining = clamp(1 - (game.elapsed - order.born) / order.ttl, 0, 1);
     const assigned = order.robot !== null;
     const color = assigned ? COLORS.accent : remaining > 0.35 ? COLORS.amber : COLORS.danger;
 
     ctx.save();
-    ctx.globalAlpha = assigned ? 0.75 : 1;
-    ctx.fillStyle = color;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
     ctx.beginPath();
-    ctx.arc(order.x, order.y, 13 * pulse, 0, Math.PI * 2);
+    ctx.ellipse(order.x, order.y + 16, 15, 6, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = color;
+    ctx.globalAlpha = assigned ? 0.55 : 0.9;
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(order.x, order.y, 21, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining);
+    ctx.arc(order.x, order.y + 2, 23, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining);
     ctx.stroke();
-
-    ctx.fillStyle = '#0b1220';
-    ctx.beginPath();
-    ctx.arc(order.x, order.y, 5, 0, Math.PI * 2);
-    ctx.fill();
     ctx.restore();
+
+    const bob = Math.sin(game.elapsed * 4 + order.id) * 2;
+    const alpha = assigned ? 0.85 : 1;
+    drawCube(order.x, order.y - 6 + bob, 12 * pulse, color, '#0f1830', '#0b1220', alpha);
+
+    if (order.attempts > 1) {
+      ctx.fillStyle = COLORS.amber;
+      ctx.font = '600 10px Consolas, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${order.attempts}/${MAX_ATTEMPTS}`, order.x, order.y + 34);
+      ctx.textAlign = 'left';
+    }
   }
 
   function drawRobot(robot) {
+    const moving = robot.state === 'toPickup' || robot.state === 'toDrop' || robot.state === 'toCharger';
+    const alive = robot.state !== 'dead';
+    const bob = alive ? Math.sin(game.elapsed * (moving ? 7 : 2.4) + robot.id) * (moving ? 1.8 : 1) : 0;
     const battery = clamp(robot.battery, 0, 100) / 100;
     const color = robot.state === 'dead' ? COLORS.danger
       : robot.battery < LOW_BATTERY ? COLORS.amber
@@ -531,16 +628,43 @@
       : COLORS.accent;
 
     if (robot.state === 'charging') {
+      const pulse = 10 + Math.sin(game.elapsed * 4) * 3;
       ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(robot.x, robot.y, ROBOT_R + 9, 0, Math.PI * 2);
+      ctx.arc(robot.x, robot.y, ROBOT_R + pulse, 0, Math.PI * 2);
       ctx.stroke();
     }
 
     ctx.save();
-    ctx.translate(robot.x, robot.y);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(robot.x, robot.y + ROBOT_R + 6, 16, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
+    ctx.save();
+    ctx.translate(robot.x, robot.y + bob);
+    ctx.rotate(robot.heading + Math.PI / 2);
+
+    // treads
+    const tread = ((game.elapsed * (moving ? 240 : 30)) % 10) / 10;
+    ctx.fillStyle = '#1b2740';
+    roundedRect(-ROBOT_R * 0.95, ROBOT_R * 0.45, ROBOT_R * 0.7, 7, 3);
+    ctx.fill();
+    roundedRect(ROBOT_R * 0.25, ROBOT_R * 0.45, ROBOT_R * 0.7, 7, 3);
+    ctx.fill();
+    ctx.strokeStyle = COLORS.shelfEdge;
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i += 1) {
+      const offset = -ROBOT_R * 0.95 + ROBOT_R * 0.7 * ((tread + i / 3) % 1);
+      ctx.beginPath();
+      ctx.moveTo(offset, ROBOT_R * 0.45);
+      ctx.lineTo(offset, ROBOT_R * 0.45 + 7);
+      ctx.stroke();
+    }
+
+    // body
     ctx.fillStyle = robot.state === 'dead' ? '#2a1420' : '#16233b';
     ctx.strokeStyle = color;
     ctx.lineWidth = 2.5;
@@ -549,36 +673,46 @@
     ctx.fill();
     ctx.stroke();
 
+    // eyes with blink
+    const blinkPhase = Math.sin(game.elapsed * 1.6 + robot.id * 2.1);
+    const eyeHeight = blinkPhase > 0.97 ? 1 : 3;
     ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(-5, -3, 3, 0, Math.PI * 2);
-    ctx.arc(5, -3, 3, 0, Math.PI * 2);
+    roundedRect(-8, -5, 5, eyeHeight, 1.5);
+    ctx.fill();
+    roundedRect(3, -5, 5, eyeHeight, 1.5);
     ctx.fill();
 
+    // antenna
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.arc(0, 2, 6, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.moveTo(0, -ROBOT_R);
+    ctx.lineTo(0, -ROBOT_R - 9);
     ctx.stroke();
-
-    if (robot.order) {
-      ctx.fillStyle = COLORS.amber;
-      roundedRect(-6, -ROBOT_R - 14, 12, 10, 3);
-      ctx.fill();
-    }
+    const glow = 0.5 + 0.5 * Math.sin(game.elapsed * 6 + robot.id);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, -ROBOT_R - 11, 1.8 + glow * 1.6, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
 
+    // battery arc
     ctx.strokeStyle = color;
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(robot.x, robot.y, ROBOT_R + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * battery);
+    ctx.arc(robot.x, robot.y + bob, ROBOT_R + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * battery);
     ctx.stroke();
+
+    // carried cube
+    if (robot.order) {
+      drawCube(robot.x, robot.y + bob - ROBOT_R - 12, 8, COLORS.amber, '#a16207', '#78350f', 0.95);
+    }
 
     ctx.fillStyle = COLORS.muted;
     ctx.font = '600 11px Consolas, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(robot.name, robot.x, Math.min(robot.y + ROBOT_R + 20, H - 6));
+    ctx.fillText(robot.name, robot.x, Math.min(robot.y + ROBOT_R + 22, H - 6));
     ctx.textAlign = 'left';
 
     if (robot.state === 'dead') {
@@ -591,16 +725,20 @@
       ctx.lineTo(robot.x - 8, robot.y + 8);
       ctx.stroke();
     }
+
+    if (robot.state === 'charging') {
+      ctx.fillStyle = COLORS.accent;
+      ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚡', robot.x, robot.y - ROBOT_R - 16);
+      ctx.textAlign = 'left';
+    }
   }
 
   function draw() {
     if (!game) return;
     drawBackground();
     drawDropZone();
-    for (const order of game.orders) {
-      const carrier = order.robot === null ? null : game.robots[order.robot];
-      if (!carrier || carrier.state === 'toPickup') drawOrder(order);
-    }
 
     ctx.strokeStyle = 'rgba(52, 211, 153, 0.18)';
     ctx.lineWidth = 1.5;
@@ -612,7 +750,15 @@
       ctx.stroke();
     }
 
+    for (const order of game.orders) drawOrder(order);
     for (const robot of game.robots) drawRobot(robot);
+
+    for (const particle of game.particles) {
+      ctx.globalAlpha = clamp(particle.life * 1.6, 0, 1);
+      ctx.fillStyle = particle.color;
+      ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
+      ctx.globalAlpha = 1;
+    }
 
     for (const item of game.floats) {
       ctx.globalAlpha = clamp(item.life, 0, 1);
@@ -625,12 +771,12 @@
     }
 
     if (game.messageTimer > 0 && game.message) {
-      ctx.fillStyle = 'rgba(11, 18, 32, 0.85)';
+      ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';
       const width = ctx.measureText(game.message).width + 28;
+      ctx.fillStyle = 'rgba(11, 18, 32, 0.9)';
       roundedRect(W / 2 - width / 2, 14, width, 30, 10);
       ctx.fill();
       ctx.fillStyle = COLORS.amber;
-      ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(game.message, W / 2, 34);
       ctx.textAlign = 'left';
@@ -737,6 +883,7 @@
     game = createGame((Date.now() % 100000) + 1);
     hud.overlay.hidden = true;
     updateHud();
+    draw();
   }
 
   hud.pause.addEventListener('click', togglePause);
@@ -801,6 +948,28 @@
     stepFor(2);
     check('при нуле жизней игра завершается', game.over === true, `over=${game.over}`);
 
+    game = createGame(6);
+    game.autoSpawn = false;
+    const retried = spawnOrder();
+    retried.ttl = 60;
+    const doomed = dispatchToNearest(retried);
+    doomed.battery = 1;
+    stepFor(3);
+    const stillQueued = game.orders.includes(retried) && retried.robot === null;
+    check('заказ вернулся в очередь', stillQueued, `attempts=${retried.attempts}`);
+    check('попытка засчитана', retried.attempts === 2, `attempts=${retried.attempts}`);
+    check('жизнь пока цела', game.lives === 3, `lives=${game.lives}`);
+
+    game = createGame(8);
+    game.autoSpawn = false;
+    const last = spawnOrder();
+    last.ttl = 60;
+    last.attempts = MAX_ATTEMPTS;
+    const exhausted = dispatchToNearest(last);
+    exhausted.battery = 1;
+    stepFor(3);
+    check('после 3 попыток заказ потерян', game.missed === 1 && game.lives === 2, `missed=${game.missed}, lives=${game.lives}`);
+
     const failed = results.filter((item) => !item.ok);
     hud.selftest.hidden = false;
     hud.selftest.textContent = `${failed.length ? 'SELFTEST FAIL' : 'SELFTEST OK'}\n` +
@@ -808,22 +977,23 @@
     window.__selftest = { ok: failed.length === 0, results };
   }
 
-  const demoSeconds = Number(new URLSearchParams(location.search).get('demo') || 0);
+  const demoSeconds = Number(params.get('demo') || 0);
 
   game = createGame(7);
   if (isSelfTest) {
     selfTest();
-    return;
-  }
-  if (demoSeconds > 0) {
-    for (let time = 0; time < demoSeconds; time += 0.1) {
-      update(0.1);
-      const waiting = game.orders.find((order) => order.robot === null);
-      if (waiting) dispatchToNearest(waiting);
+  } else {
+    if (demoSeconds > 0) {
+      for (let time = 0; time < demoSeconds; time += 0.1) {
+        update(0.1);
+        const waiting = game.orders.find((order) => order.robot === null);
+        if (waiting) dispatchToNearest(waiting);
+      }
     }
+    updateHud();
+    draw();
+    requestAnimationFrame(frame);
   }
-  updateHud();
-  requestAnimationFrame(frame);
 })();
 </script>
 </body>
