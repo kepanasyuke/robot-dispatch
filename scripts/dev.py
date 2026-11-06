@@ -65,6 +65,7 @@ def cmd_help(_args: argparse.Namespace) -> int:
   check        lint + typecheck + test
   proto        regenerate gRPC stubs from projects/grpc-fleet-api/proto
   docs         regenerate the scenario GIF and validate the SVG diagrams
+  game-gif     re-render docs/game/gameplay.gif with headless Chrome/Edge
   projects     list the projects in this repository
   up / down    docker compose stack for robot-dispatch
   logs         follow api/dispatcher/consumer logs
@@ -142,6 +143,10 @@ def cmd_docs(_args: argparse.Namespace) -> int:
     return _validate_diagrams()
 
 
+def cmd_game_gif(_args: argparse.Namespace) -> int:
+    return run(python(str(ROOT / "scripts" / "make_game_gif.py")))
+
+
 def _validate_diagrams() -> int:
     import xml.etree.ElementTree as ElementTree
 
@@ -159,6 +164,7 @@ def _validate_diagrams() -> int:
         return 1
     print(f"  ok {gif.relative_to(ROOT)} ({gif.stat().st_size / 1024:.0f} KB)")
     return 0
+
 
 def cmd_projects(_args: argparse.Namespace) -> int:
     width = max(len(name) for name in PROJECTS)
@@ -221,6 +227,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("check", add_help=False).set_defaults(func=cmd_check)
     subparsers.add_parser("proto", add_help=False).set_defaults(func=cmd_proto)
     subparsers.add_parser("docs", add_help=False).set_defaults(func=cmd_docs)
+    subparsers.add_parser("game-gif", add_help=False).set_defaults(func=cmd_game_gif)
     subparsers.add_parser("projects", add_help=False).set_defaults(func=cmd_projects)
     subparsers.add_parser("up", add_help=False).set_defaults(func=cmd_up)
     subparsers.add_parser("down", add_help=False).set_defaults(func=cmd_down)

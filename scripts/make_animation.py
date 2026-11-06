@@ -399,9 +399,7 @@ def render(frame: Frame, index: int, total: int) -> Image.Image:
     rounded(draw, (32, 232, 928, 420), 16, COLORS["card"], COLORS["card_border"], width=2)
 
     fitted_label(draw, (52, 252), "task 9f3c-4d1a", "mono", 12, 600, COLORS["text"])
-    fitted_label(
-        draw, (52, 274), "delivery · priority 200 · wms:A-100", "mono", 11, 600, COLORS["mono"]
-    )
+    fitted_label(draw, (52, 274), "delivery · priority 200 · wms:A-100", "mono", 11, 600, COLORS["mono"])
 
     status_color = COLORS.get(frame.status, COLORS["muted"])
     pill(draw, 908, 248, frame.status, status_color, max_width=220)

@@ -2,7 +2,7 @@
 PYTHON ?= python
 DEV = $(PYTHON) scripts/dev.py
 
-.PHONY: help install lint format typecheck test check proto docs projects up down logs migrate sim
+.PHONY: help install lint format typecheck test check proto docs game-gif projects up down logs migrate sim
 
 help:
 	@$(DEV) help
@@ -30,6 +30,9 @@ proto:
 
 docs:
 	@$(DEV) docs
+
+game-gif:
+	@$(DEV) game-gif
 
 projects:
 	@$(DEV) projects
