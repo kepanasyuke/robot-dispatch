@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 660" width="1240" height="660" role="img" aria-labelledby="lifeTitle lifeDesc">
+  <title id="lifeTitle">Жизненный цикл задачи</title>
+  <desc id="lifeDesc">Статусы задачи и переходы: pending, assigned, running, retrying, succeeded, failed, cancelled.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b7bab"/>
+    </marker>
+    <style>
+      .bg { fill: #0b1220; }
+      .title { font-family: "Segoe UI", system-ui, sans-serif; font-size: 26px; font-weight: 600; fill: #e9f0fb; }
+      .subtitle { font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; fill: #8ea3c4; }
+      .node { fill: #141f36; stroke: #2b3b57; stroke-width: 1.6; }
+      .n-pending { stroke: #94a3b8; }
+      .n-assigned { stroke: #60a5fa; }
+      .n-running { stroke: #34d399; }
+      .n-retrying { stroke: #fbbf24; }
+      .n-succeeded { stroke: #22c55e; fill: #10261a; }
+      .n-failed { stroke: #f87171; fill: #2a1420; }
+      .n-cancelled { stroke: #64748b; fill: #131a26; }
+      .label { font-family: "Segoe UI", system-ui, sans-serif; font-size: 16px; font-weight: 600; fill: #e9f0fb; }
+      .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; fill: #93a8c8; }
+      .cap { font-family: "Segoe UI", system-ui, sans-serif; font-size: 12.5px; fill: #b9c9e2; }
+      .note { font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px; fill: #8ea3c4; }
+      .arrow { stroke: #5b7bab; stroke-width: 1.7; fill: none; }
+      .arrow-retry { stroke: #fbbf24; stroke-width: 1.7; fill: none; }
+      .arrow-fail { stroke: #f87171; stroke-width: 1.7; fill: none; }
+      .arrow-cancel { stroke: #64748b; stroke-width: 1.5; fill: none; stroke-dasharray: 5 5; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1240" height="660"/>
+  <text class="title" x="40" y="48">Жизненный цикл задачи</text>
+  <text class="subtitle" x="40" y="74">Каждый переход проходит через ensure_transition(); недопустимый — InvalidTransition, а не порча данных</text>
+
+  <!-- nodes -->
+  <rect class="node n-pending" x="60" y="120" width="190" height="76" rx="14"/>
+  <text class="label" x="82" y="152">pending</text>
+  <text class="mono" x="82" y="176">в очереди</text>
+
+  <rect class="node n-assigned" x="330" y="120" width="190" height="76" rx="14"/>
+  <text class="label" x="352" y="152">assigned</text>
+  <text class="mono" x="352" y="176">робот занят, lease</text>
+
+  <rect class="node n-running" x="600" y="120" width="190" height="76" rx="14"/>
+  <text class="label" x="622" y="152">running</text>
+  <text class="mono" x="622" y="176">progress продлевает</text>
+
+  <rect class="node n-succeeded" x="890" y="120" width="190" height="76" rx="14"/>
+  <text class="label" x="912" y="152">succeeded</text>
+  <text class="mono" x="912" y="176">result сохранён</text>
+
+  <rect class="node n-retrying" x="330" y="320" width="190" height="76" rx="14"/>
+  <text class="label" x="352" y="352">retrying</text>
+  <text class="mono" x="352" y="376">backoff 5s → 10s → 20s</text>
+
+  <rect class="node n-failed" x="890" y="320" width="190" height="76" rx="14"/>
+  <text class="label" x="912" y="352">failed</text>
+  <text class="mono" x="912" y="376">попытки исчерпаны</text>
+
+  <rect class="node n-cancelled" x="60" y="320" width="190" height="76" rx="14"/>
+  <text class="label" x="82" y="352">cancelled</text>
+  <text class="mono" x="82" y="376">только до running</text>
+
+  <!-- edges -->
+  <path class="arrow" d="M 250 158 H 330" marker-end="url(#arrow)"/>
+  <text class="cap" x="262" y="146">dispatch</text>
+
+  <path class="arrow" d="M 520 158 H 600" marker-end="url(#arrow)"/>
+  <text class="cap" x="532" y="146">progress</text>
+
+  <path class="arrow" d="M 790 158 H 890" marker-end="url(#arrow)"/>
+  <text class="cap" x="800" y="146">result: succeeded</text>
+
+  <path class="arrow-retry" d="M 425 196 V 320" marker-end="url(#arrow)"/>
+  <text class="cap" x="434" y="248">ошибка робота</text>
+  <text class="cap" x="434" y="266">или lease истёк</text>
+
+  <path class="arrow-retry" d="M 385 320 V 196" marker-end="url(#arrow)"/>
+  <text class="cap" x="300" y="248">backoff</text>
+  <text class="cap" x="300" y="266">истёк</text>
+
+  <path class="arrow-fail" d="M 695 196 V 358 H 890" marker-end="url(#arrow)"/>
+  <text class="cap" x="704" y="300">attempts = max</text>
+
+  <path class="arrow-cancel" d="M 155 196 V 320" marker-end="url(#arrow)"/>
+  <text class="cap" x="164" y="248">cancel</text>
+
+  <path class="arrow-cancel" d="M 330 358 H 250" marker-end="url(#arrow)"/>
+  <text class="cap" x="262" y="346">cancel</text>
+
+  <text class="note" x="60" y="470">Инварианты: терминальные статусы неизменяемы; опоздавший результат прошлой попытки отбрасывается по command_id;</text>
+  <text class="note" x="60" y="494">running-задачу отменяет робот, API возвращает 409 — иначе команда продолжила бы исполняться.</text>
+  <text class="note" x="60" y="540">Повтор задачи создаёт новый command_id и новый lease: робот никогда не выполняет одну команду дважды.</text>
+</svg>

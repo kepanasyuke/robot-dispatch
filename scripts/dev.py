@@ -64,6 +64,7 @@ def cmd_help(_args: argparse.Namespace) -> int:
   test [path]  pytest (all projects by default, or the given paths)
   check        lint + typecheck + test
   proto        regenerate gRPC stubs from projects/grpc-fleet-api/proto
+  docs         regenerate the scenario GIF and validate the SVG diagrams
   projects     list the projects in this repository
   up / down    docker compose stack for robot-dispatch
   logs         follow api/dispatcher/consumer logs
@@ -134,6 +135,31 @@ def cmd_proto(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_docs(_args: argparse.Namespace) -> int:
+    code = run(python(str(ROOT / "scripts" / "make_animation.py")))
+    if code != 0:
+        return code
+    return _validate_diagrams()
+
+
+def _validate_diagrams() -> int:
+    import xml.etree.ElementTree as ElementTree
+
+    diagrams = sorted((ROOT / "docs" / "diagrams").glob("*.svg"))
+    for path in diagrams:
+        try:
+            ElementTree.parse(path)
+        except ElementTree.ParseError as exc:
+            print(f"! {path.relative_to(ROOT)} is not valid xml: {exc}", file=sys.stderr)
+            return 1
+        print(f"  ok {path.relative_to(ROOT)}")
+    gif = ROOT / "docs" / "animation" / "dispatch-flow.gif"
+    if not gif.exists():
+        print(f"! {gif.relative_to(ROOT)} is missing", file=sys.stderr)
+        return 1
+    print(f"  ok {gif.relative_to(ROOT)} ({gif.stat().st_size / 1024:.0f} KB)")
+    return 0
+
 def cmd_projects(_args: argparse.Namespace) -> int:
     width = max(len(name) for name in PROJECTS)
     for name, description in PROJECTS.items():
@@ -194,6 +220,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("typecheck", add_help=False).set_defaults(func=cmd_typecheck)
     subparsers.add_parser("check", add_help=False).set_defaults(func=cmd_check)
     subparsers.add_parser("proto", add_help=False).set_defaults(func=cmd_proto)
+    subparsers.add_parser("docs", add_help=False).set_defaults(func=cmd_docs)
     subparsers.add_parser("projects", add_help=False).set_defaults(func=cmd_projects)
     subparsers.add_parser("up", add_help=False).set_defaults(func=cmd_up)
     subparsers.add_parser("down", add_help=False).set_defaults(func=cmd_down)

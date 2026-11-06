@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 560" width="1240" height="560" role="img" aria-labelledby="mapTitle mapDesc">
+  <title id="mapTitle">Карта проектов монорепозитория</title>
+  <desc id="mapDesc">Шесть проектов: диспетчеризация и пять соседних сервисов с интеграционными контрактами.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4f6b95"/>
+    </marker>
+    <style>
+      .bg { fill: #0b1220; }
+      .title { font-family: "Segoe UI", system-ui, sans-serif; font-size: 26px; font-weight: 600; fill: #e9f0fb; }
+      .subtitle { font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px; fill: #8ea3c4; }
+      .core { fill: #10263a; stroke: #34d399; stroke-width: 2; }
+      .sat { fill: #141f36; stroke: #2b3b57; stroke-width: 1.6; }
+      .label { font-family: "Segoe UI", system-ui, sans-serif; font-size: 17px; font-weight: 600; fill: #e9f0fb; }
+      .core-label { font-family: "Segoe UI", system-ui, sans-serif; font-size: 22px; font-weight: 600; fill: #a7f3d0; }
+      .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; fill: #93a8c8; }
+      .cap { font-family: "Segoe UI", system-ui, sans-serif; font-size: 12.5px; fill: #b9c9e2; }
+      .note { font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px; fill: #8ea3c4; }
+      .link { stroke: #4f6b95; stroke-width: 1.6; fill: none; stroke-dasharray: 5 5; }
+      .badge { font-family: Consolas, "Cascadia Mono", monospace; font-size: 11px; fill: #34d399; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1240" height="560"/>
+  <text class="title" x="40" y="48">Шесть проектов — одна система</text>
+  <text class="subtitle" x="40" y="74">Монорепозиторий: диспетчеризация в центре, вокруг — сервисы, которые с ней стыкуются</text>
+
+  <!-- core -->
+  <rect class="core" x="320" y="96" width="600" height="108" rx="16"/>
+  <text class="core-label" x="348" y="140">robot-dispatch</text>
+  <text class="mono" x="348" y="166">задача → диспетчер → робот → результат · FastAPI · PostgreSQL · RabbitMQ</text>
+  <text class="badge" x="348" y="188">70 тестов · outbox · lease · SKIP LOCKED</text>
+
+  <!-- satellites -->
+  <rect class="sat" x="48" y="330" width="216" height="150" rx="14"/>
+  <text class="label" x="68" y="364">telemetry-hub</text>
+  <text class="mono" x="68" y="392">MQTT-поток</text>
+  <text class="mono" x="68" y="412">дедуп · порядок</text>
+  <text class="mono" x="68" y="432">агрегаты</text>
+  <text class="badge" x="68" y="460">23 теста</text>
+
+  <rect class="sat" x="280" y="330" width="216" height="150" rx="14"/>
+  <text class="label" x="300" y="364">ros2-bridge</text>
+  <text class="mono" x="300" y="392">топики ROS2</text>
+  <text class="mono" x="300" y="412">единицы · кадры</text>
+  <text class="mono" x="300" y="432">дедуп команд</text>
+  <text class="badge" x="300" y="460">22 теста</text>
+
+  <rect class="sat" x="512" y="330" width="216" height="150" rx="14"/>
+  <text class="label" x="532" y="364">grpc-fleet-api</text>
+  <text class="mono" x="532" y="392">proto · стабы</text>
+  <text class="mono" x="532" y="412">статус-коды</text>
+  <text class="mono" x="532" y="432">интерцепторы</text>
+  <text class="badge" x="532" y="460">15 тестов</text>
+
+  <rect class="sat" x="744" y="330" width="216" height="150" rx="14"/>
+  <text class="label" x="764" y="364">fleet-monitor</text>
+  <text class="mono" x="764" y="392">heartbeat SLA</text>
+  <text class="mono" x="764" y="412">гистерезис</text>
+  <text class="mono" x="764" y="432">Prometheus</text>
+  <text class="badge" x="764" y="460">21 тест</text>
+
+  <rect class="sat" x="976" y="330" width="216" height="150" rx="14"/>
+  <text class="label" x="996" y="364">wms-integration</text>
+  <text class="mono" x="996" y="392">retry · breaker</text>
+  <text class="mono" x="996" y="412">идемпотентность</text>
+  <text class="mono" x="996" y="432">HMAC-вебхуки</text>
+  <text class="badge" x="996" y="460">22 теста</text>
+
+  <!-- links -->
+  <path class="link" d="M 156 330 L 400 204" marker-end="url(#arrow)"/>
+  <path class="link" d="M 388 330 L 520 204" marker-end="url(#arrow)"/>
+  <path class="link" d="M 620 330 L 620 204" marker-end="url(#arrow)"/>
+  <path class="link" d="M 852 330 L 740 204" marker-end="url(#arrow)"/>
+  <path class="link" d="M 1084 330 L 860 204" marker-end="url(#arrow)"/>
+
+  <text class="cap" x="170" y="268">MQTT</text>
+  <text class="cap" x="404" y="310">AMQP</text>
+  <text class="cap" x="632" y="276">gRPC</text>
+  <text class="cap" x="790" y="298">health</text>
+  <text class="cap" x="980" y="262">HTTP</text>
+
+  <text class="note" x="40" y="524">Стрелки — интеграционные контракты: HTTP с идемпотентностью, AMQP-команды, gRPC fleet API, MQTT-телеметрия.</text>
+</svg>

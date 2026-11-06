@@ -13,17 +13,16 @@
 монитор поднимает алерты → диспетчер ставит задачи → мост отдаёт команды в ROS2 → результаты
 возвращаются в диспетчер → WMS получает статусы.
 
-```
-WMS ──HTTP──▶ wms-integration ──▶ robot-dispatch ──command──▶ ros2-bridge ──▶ ROS2
-                                       ▲   │
-                                       │   └──outbox──▶ RabbitMQ
-                                       │
-telemetry-hub ◀──MQTT── роботы    fleet-monitor ──▶ Prometheus
-                                       ▲
-                          grpc-fleet-api (fleet control plane)
-```
+![Архитектура robot-dispatch: API, PostgreSQL, outbox, RabbitMQ и флот ROS2](docs/diagrams/architecture.svg)
+
+![Сценарий диспетчеризации: задача, замолчавший робот и повтор на другом роботе](docs/animation/dispatch-flow.gif)
+
+*Сценарий: задача создаётся, робот её берёт и замолкает — lease истекает, задача повторяется на втором
+роботе и завершается успехом. 8 кадров, собираются командой `make docs`.*
 
 ## Проекты
+
+![Карта проектов: диспетчеризация и пять соседних сервисов](docs/diagrams/projects.svg)
 
 | Проект | Что демонстрирует | Стек | Тесты |
 |---|---|---|---|
@@ -55,6 +54,7 @@ make up          # docker compose: postgres, rabbitmq, redis, api, dispatcher, c
 | `test [путь]` | pytest: всё или конкретный проект |
 | `check` | lint + typecheck + test |
 | `proto` | перегенерация gRPC-стабов (включая `.pyi`) |
+| `docs` | пересборка GIF-анимации и проверка SVG-схем |
 | `projects` | список проектов репозитория |
 | `up` / `down` / `logs` / `migrate` / `sim` | docker-compose и локальный симулятор флота |
 
@@ -64,6 +64,8 @@ python scripts/dev.py projects
 ```
 
 ## robot-dispatch: ключевые решения
+
+![Жизненный цикл задачи: pending, assigned, running, retrying, succeeded, failed, cancelled](docs/diagrams/lifecycle.svg)
 
 | Отказ | Механизм |
 |---|---|
@@ -77,8 +79,8 @@ python scripts/dev.py projects
 | Битое сообщение от робота | немедленный dead-letter |
 | Сбой обработчика | retry-очередь с TTL, затем DLQ |
 
-Подробности — в разделе «Паттерны отказоустойчивости» [основного README-описания](#) и в коде:
-`src/robot_dispatch/services/dispatcher.py`, `src/robot_dispatch/messaging/outbox_relay.py`.
+Подробности — в коде: `src/robot_dispatch/services/dispatcher.py`,
+`src/robot_dispatch/messaging/outbox_relay.py`, `src/robot_dispatch/domain/state_machine.py`.
 
 ## Структура
 
