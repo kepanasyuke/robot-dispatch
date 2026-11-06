@@ -3,8 +3,11 @@
 
 The animation tells the reliability story in one loop: a task is queued, a robot
 takes it, the robot goes silent, the lease expires, the task is retried on a
-second robot and succeeds. Frames are drawn with Pillow so the file is
-reproducible from the repository (`python scripts/dev.py docs`).
+second robot and succeeds.
+
+Every label is measured before it is drawn: the font shrinks to fit its
+container, and long captions wrap to two lines. The renderer also verifies that
+no pixel lands in the outer margin, so text can never be clipped by the canvas.
 
 Usage:
     python scripts/make_animation.py
@@ -23,7 +26,9 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = ROOT / "docs" / "animation" / "dispatch-flow.gif"
 
-WIDTH, HEIGHT = 960, 540
+WIDTH, HEIGHT = 960, 560
+MARGIN = 6
+DETAIL_MAX_LINES = 2
 
 COLORS = {
     "bg": "#0b1220",
@@ -163,6 +168,56 @@ FRAMES: tuple[Frame, ...] = (
 )
 
 
+# --------------------------------------------------------------------- helpers
+
+
+def text_width(draw: ImageDraw.ImageDraw, text: str, font) -> float:
+    return float(draw.textlength(text, font=font))
+
+
+def fit_font(draw: ImageDraw.ImageDraw, text: str, kind: str, size: int, max_width: float, min_size: int = 9):
+    """Largest font size that keeps `text` within `max_width`."""
+    for candidate in range(size, min_size - 1, -1):
+        font = load_font(kind, candidate)
+        if text_width(draw, text, font) <= max_width:
+            return font
+    return load_font(kind, min_size)
+
+
+def wrap_text(draw: ImageDraw.ImageDraw, text: str, font, max_width: float) -> list[str]:
+    lines: list[str] = []
+    current = ""
+    for word in text.split():
+        candidate = f"{current} {word}".strip()
+        if current and text_width(draw, candidate, font) > max_width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines
+
+
+def fit_paragraph(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    kind: str,
+    size: int,
+    max_width: float,
+    max_lines: int = DETAIL_MAX_LINES,
+):
+    """Shrink, then wrap; the last line is ellipsized if it still overflows."""
+    font = fit_font(draw, text, kind, size, max_width)
+    lines = wrap_text(draw, text, font, max_width)
+    if len(lines) > max_lines:
+        merged = " ".join(lines[max_lines - 1 :])
+        while merged and text_width(draw, merged + "…", font) > max_width:
+            merged = merged[:-1].rstrip()
+        lines = [*lines[: max_lines - 1], merged + "…"]
+    return font, lines
+
+
 def rounded(draw: ImageDraw.ImageDraw, box, radius: int, fill: str, outline: str, width: int = 2) -> None:
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
 
@@ -176,6 +231,21 @@ def label(
     anchor: str = "la",
 ) -> None:
     draw.text(xy, text, font=font, fill=fill, anchor=anchor)
+
+
+def fitted_label(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[float, float],
+    text: str,
+    kind: str,
+    size: int,
+    max_width: float,
+    fill: str,
+    anchor: str = "la",
+    min_size: int = 9,
+) -> None:
+    font = fit_font(draw, text, kind, size, max_width, min_size)
+    label(draw, xy, text, font, fill, anchor)
 
 
 def arrow(
@@ -193,18 +263,20 @@ def arrow(
     draw.polygon([end, left, right], fill=color)
 
 
-def pill(draw: ImageDraw.ImageDraw, x: float, y: float, text: str, color: str, font) -> None:
-    padding = 14
-    width = draw.textlength(text, font=font) + padding * 2
+def pill(
+    draw: ImageDraw.ImageDraw,
+    right: float,
+    top: float,
+    text: str,
+    color: str,
+    max_width: float,
+) -> None:
+    font = fit_font(draw, text, "mono", 12, max_width - 28)
+    width = text_width(draw, text, font) + 28
     height = 34
-    draw.rounded_rectangle(
-        (x - width, y, x, y + height),
-        radius=height // 2,
-        fill="#0d1526",
-        outline=color,
-        width=2,
-    )
-    draw.text((x - width / 2, y + height / 2), text, font=font, fill=color, anchor="mm")
+    box = (right - width, top, right, top + height)
+    draw.rounded_rectangle(box, radius=height // 2, fill="#0d1526", outline=color, width=2)
+    draw.text((right - width / 2, top + height / 2), text, font=font, fill=color, anchor="mm")
 
 
 def robot_card(
@@ -212,8 +284,6 @@ def robot_card(
     box: tuple[float, float, float, float],
     name: str,
     state: str,
-    font_bold,
-    font_mono,
 ) -> None:
     palette = {
         "idle": COLORS["panel_border"],
@@ -223,36 +293,51 @@ def robot_card(
     status_text = {"idle": "idle", "busy": "выполняет", "dead": "timeout"}[state]
     fill = COLORS["panel"] if state != "dead" else "#241521"
     rounded(draw, box, 12, fill, palette[state], width=3 if state != "idle" else 2)
-    x, y, _, _ = box
-    label(draw, (x + 12, y + 12), name, font_bold, COLORS["text"])
-    status_color = {
-        "idle": COLORS["muted"],
-        "busy": COLORS["running"],
-        "dead": COLORS["danger"],
-    }[state]
-    label(draw, (x + 12, y + 36), status_text, font_mono, status_color)
+    x, y, x1, _ = box
+    inner = x1 - x - 24
+    fitted_label(draw, (x + 12, y + 12), name, "bold", 13, inner, COLORS["text"])
+    status_color = {"idle": COLORS["muted"], "busy": COLORS["running"], "dead": COLORS["danger"]}[state]
+    fitted_label(draw, (x + 12, y + 36), status_text, "mono", 11, inner, status_color)
     if state == "dead":
-        draw.line((box[2] - 18, y + 12, box[2] - 8, y + 22), fill=COLORS["danger"], width=3)
-        draw.line((box[2] - 8, y + 12, box[2] - 18, y + 22), fill=COLORS["danger"], width=3)
+        draw.line((x1 - 18, y + 12, x1 - 8, y + 22), fill=COLORS["danger"], width=3)
+        draw.line((x1 - 8, y + 12, x1 - 18, y + 22), fill=COLORS["danger"], width=3)
+
+
+def assert_no_clipping(image: Image.Image, frame_index: int) -> None:
+    """No pixel may land in the outer margin: that would mean clipped text."""
+    background = _rgb(COLORS["bg"])
+    pixels = image.load()
+    for x in range(image.width):
+        for y in list(range(MARGIN)) + list(range(image.height - MARGIN, image.height)):
+            if pixels[x, y] != background:
+                raise SystemExit(f"frame {frame_index}: content is clipped at ({x}, {y})")
+    for y in range(image.height):
+        for x in list(range(MARGIN)) + list(range(image.width - MARGIN, image.width)):
+            if pixels[x, y] != background:
+                raise SystemExit(f"frame {frame_index}: content is clipped at ({x}, {y})")
+
+
+def _rgb(value: str) -> tuple[int, int, int]:
+    value = value.lstrip("#")
+    return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
+
+
+# ---------------------------------------------------------------------- render
 
 
 def render(frame: Frame, index: int, total: int) -> Image.Image:
     image = Image.new("RGB", (WIDTH, HEIGHT), COLORS["bg"])
     draw = ImageDraw.Draw(image)
 
-    bold = load_font("bold", 15)
-    bold_small = load_font("bold", 13)
     bold_big = load_font("bold", 21)
-    regular = load_font("regular", 13)
-    mono = load_font("mono", 12)
-    mono_small = load_font("mono", 11)
-
     label(draw, (32, 26), "Сценарий диспетчеризации", bold_big, COLORS["text"])
-    label(
+    fitted_label(
         draw,
         (32, 56),
         "задача, молчащий робот и повтор на другом роботе",
-        regular,
+        "regular",
+        13,
+        896,
         COLORS["muted"],
     )
 
@@ -262,10 +347,10 @@ def render(frame: Frame, index: int, total: int) -> Image.Image:
     idle_color = COLORS["line"]
 
     components = [
-        ("WMS", (32, 96, 172, 166)),
-        ("API · FastAPI", (196, 96, 366, 166)),
-        ("Dispatcher", (386, 96, 556, 166)),
-        ("RabbitMQ", (576, 96, 716, 166)),
+        ("WMS", (32, 96, 172, 166), "HTTP"),
+        ("API · FastAPI", (196, 96, 366, 166), "/api/v1"),
+        ("Dispatcher", (386, 96, 556, 166), "SKIP LOCKED"),
+        ("RabbitMQ", (576, 96, 716, 166), "AMQP"),
     ]
     active_components = {
         "wms_api": {"WMS", "API · FastAPI"},
@@ -278,7 +363,7 @@ def render(frame: Frame, index: int, total: int) -> Image.Image:
     for key in hot:
         highlighted |= active_components.get(key, set())
 
-    for name, box in components:
+    for name, box, subtitle in components:
         is_hot = name in highlighted
         rounded(
             draw,
@@ -288,17 +373,12 @@ def render(frame: Frame, index: int, total: int) -> Image.Image:
             hot_color if is_hot else COLORS["panel_border"],
             width=3 if is_hot else 2,
         )
-        label(draw, (box[0] + 12, box[1] + 12), name, bold_small, COLORS["text"])
-        subtitle = {
-            "WMS": "HTTP",
-            "API · FastAPI": "/api/v1",
-            "Dispatcher": "SKIP LOCKED",
-            "RabbitMQ": "AMQP",
-        }[name]
-        label(draw, (box[0] + 12, box[1] + 36), subtitle, mono_small, COLORS["muted"])
+        inner = box[2] - box[0] - 24
+        fitted_label(draw, (box[0] + 12, box[1] + 12), name, "bold", 13, inner, COLORS["text"])
+        fitted_label(draw, (box[0] + 12, box[1] + 36), subtitle, "mono", 11, inner, COLORS["muted"])
 
-    robot_card(draw, (760, 78, 900, 138), "robot-1", frame.robot1, bold_small, mono_small)
-    robot_card(draw, (760, 150, 900, 210), "robot-2", frame.robot2, bold_small, mono_small)
+    robot_card(draw, (760, 78, 900, 138), "robot-1", frame.robot1)
+    robot_card(draw, (760, 150, 900, 210), "robot-2", frame.robot2)
 
     edges = {
         "wms_api": ((172, 131), (196, 131)),
@@ -317,19 +397,21 @@ def render(frame: Frame, index: int, total: int) -> Image.Image:
 
     # ------------------------------------------------------------------- card
     rounded(draw, (32, 232, 928, 420), 16, COLORS["card"], COLORS["card_border"], width=2)
-    label(draw, (52, 252), "task 9f3c-4d1a", mono, COLORS["text"])
-    label(draw, (52, 274), "delivery · priority 200 · wms:A-100", mono_small, COLORS["mono"])
+
+    fitted_label(draw, (52, 252), "task 9f3c-4d1a", "mono", 12, 600, COLORS["text"])
+    fitted_label(
+        draw, (52, 274), "delivery · priority 200 · wms:A-100", "mono", 11, 600, COLORS["mono"]
+    )
 
     status_color = COLORS.get(frame.status, COLORS["muted"])
-    pill(draw, 908, 248, frame.status, status_color, mono)
+    pill(draw, 908, 248, frame.status, status_color, max_width=220)
 
-    # attempts
-    attempts_text = f"attempt {frame.attempts}/3" if frame.attempts else "attempt 0/3"
-    label(draw, (52, 312), attempts_text, mono, COLORS["mono"])
+    attempts = max(frame.attempts, 0)
+    fitted_label(draw, (52, 312), f"attempt {attempts}/3", "mono", 12, 118, COLORS["mono"])
     for dot in range(3):
         cx = 190 + dot * 26
         cy = 320
-        filled = dot < frame.attempts
+        filled = dot < attempts
         draw.ellipse(
             (cx - 7, cy - 7, cx + 7, cy + 7),
             fill=status_color if filled else "#1b2740",
@@ -337,7 +419,6 @@ def render(frame: Frame, index: int, total: int) -> Image.Image:
             width=1,
         )
 
-    # progress
     bar_x, bar_y, bar_w, bar_h = 52, 350, 700, 18
     draw.rounded_rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + bar_h), radius=9, fill="#16213a")
     if frame.progress > 0:
@@ -346,29 +427,30 @@ def render(frame: Frame, index: int, total: int) -> Image.Image:
             radius=9,
             fill=status_color,
         )
-    label(draw, (bar_x + bar_w + 16, bar_y - 2), f"{frame.progress}%", mono, COLORS["mono"])
+    fitted_label(draw, (bar_x + bar_w + 16, bar_y - 2), f"{frame.progress}%", "mono", 11, 90, COLORS["mono"])
 
-    # lease + detail
     lease_color = COLORS["danger"] if frame.lease == "00:00" else COLORS["mono"]
-    label(draw, (52, 384), f"lease {frame.lease}", mono_small, lease_color)
-    label(draw, (190, 384), "command_id 4f2a-9c11", mono_small, COLORS["mono"])
+    fitted_label(draw, (52, 384), f"lease {frame.lease}", "mono", 11, 120, lease_color)
+    fitted_label(draw, (190, 384), "command_id 4f2a-9c11", "mono", 11, 726, COLORS["mono"])
 
     # ---------------------------------------------------------------- caption
-    label(draw, (32, 448), frame.caption, bold, COLORS["text"])
-    label(draw, (32, 474), frame.detail, regular, COLORS["muted"])
+    fitted_label(draw, (32, 450), frame.caption, "bold", 16, 896, COLORS["text"])
 
-    # timeline dots
+    detail_font, detail_lines = fit_paragraph(draw, frame.detail, "regular", 14, 896)
+    for line_index, line in enumerate(detail_lines):
+        label(draw, (32, 474 + line_index * 19), line, detail_font, COLORS["muted"])
+
+    # footer + timeline
+    footer = "robot-dispatch · lifecycle: pending → assigned → running → retrying → succeeded"
+    fitted_label(draw, (32, 534), footer, "mono", 11, 720, "#5f7396", min_size=8)
     for dot in range(total):
-        cx = 780 + dot * 20
-        cy = 510
-        active = dot == index
+        cx = 800 + dot * 18
+        cy = 531
         draw.ellipse(
             (cx - 4, cy - 4, cx + 4, cy + 4),
-            fill=status_color if active else "#243250",
+            fill=status_color if dot == index else "#243250",
         )
 
-    footer = "robot-dispatch · lifecycle: pending → assigned → running → retrying → succeeded"
-    label(draw, (32, 506), footer, mono_small, "#5f7396")
     return image
 
 
@@ -380,6 +462,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     images = [render(frame, index, len(FRAMES)) for index, frame in enumerate(FRAMES)]
+    for index, image in enumerate(images):
+        assert_no_clipping(image, index + 1)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     images[0].save(
