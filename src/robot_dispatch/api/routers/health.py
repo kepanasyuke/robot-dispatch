@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy import text
 
 from robot_dispatch.api.deps import get_broker, get_settings_dep, get_uow_factory
 from robot_dispatch.api.schemas import HealthResponse
@@ -30,7 +29,7 @@ async def readiness(
 
     try:
         async with uow_factory() as uow:
-            await uow.session.execute(text("SELECT 1"))
+            await uow.tasks.count_by_status()
         checks["database"] = "ok"
     except Exception as exc:  # noqa: BLE001 - readiness must report, not raise
         checks["database"] = f"error: {exc}"

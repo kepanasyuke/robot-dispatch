@@ -24,7 +24,7 @@ from typing import Any
 import aio_pika
 import httpx
 from aio_pika import DeliveryMode, ExchangeType, Message
-from aio_pika.abc import AbstractIncomingMessage
+from aio_pika.abc import AbstractChannel, AbstractExchange, AbstractIncomingMessage
 
 EVENTS_EXCHANGE = "robot.events"
 
@@ -73,8 +73,8 @@ class SimulatedRobot:
         self.executed_commands: set[str] = set()
         self.busy = False
         self._connection: aio_pika.abc.AbstractRobustConnection | None = None
-        self._channel = None
-        self._events_exchange = None
+        self._channel: AbstractChannel | None = None
+        self._events_exchange: AbstractExchange | None = None
 
     async def register(self) -> None:
         async with httpx.AsyncClient(timeout=10) as http:

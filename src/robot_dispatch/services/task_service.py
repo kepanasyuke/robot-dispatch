@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -106,7 +107,7 @@ class TaskService:
         task_type: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[Task]:
+    ) -> Sequence[Task]:
         async with self._uow_factory() as uow:
             return await uow.tasks.list(
                 statuses=statuses,
@@ -116,7 +117,7 @@ class TaskService:
                 offset=offset,
             )
 
-    async def events(self, task_id: uuid.UUID) -> list[TaskEvent]:
+    async def events(self, task_id: uuid.UUID) -> Sequence[TaskEvent]:
         async with self._uow_factory() as uow:
             return await uow.events.list_for_task(task_id)
 

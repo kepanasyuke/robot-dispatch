@@ -54,7 +54,7 @@ async def main() -> None:
         reaper = LeaseReaper(rt.uow_factory, settings)
         watchdog = HeartbeatWatchdog(RobotService(rt.uow_factory), settings)
 
-        lock = RedisLock(settings.redis_url, ttl_ms=10_000)
+        lock: RedisLock | NullLock = RedisLock(settings.redis_url, ttl_ms=10_000)
         if settings.redis_url:
             await lock.connect()
         else:

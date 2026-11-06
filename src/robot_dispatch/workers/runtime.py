@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import signal
 import sys
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -87,7 +88,7 @@ async def periodic(
     logger.info("loop stopped", loop=name)
 
 
-def run(main_coro_factory: Callable[[], Awaitable[None]]) -> None:
+def run(main_coro_factory: Callable[[], Coroutine[Any, Any, None]]) -> None:
     try:
         asyncio.run(main_coro_factory())
     except KeyboardInterrupt:  # pragma: no cover - interactive shutdown

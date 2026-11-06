@@ -77,7 +77,7 @@ class InMemoryTaskRepository:
             and task.lease_expires_at is not None
             and task.lease_expires_at < now
         ]
-        expired.sort(key=lambda task: task.lease_expires_at)
+        expired.sort(key=lambda task: task.lease_expires_at or task.created_at)
         return expired[:limit]
 
     async def list(
@@ -138,7 +138,7 @@ class InMemoryRobotRepository:
             and robot.last_seen_at >= threshold
             and robot.supports(task_type)
         ]
-        candidates.sort(key=lambda robot: robot.last_seen_at, reverse=True)
+        candidates.sort(key=lambda robot: robot.last_seen_at or robot.created_at, reverse=True)
         return candidates[0] if candidates else None
 
 

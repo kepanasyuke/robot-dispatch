@@ -49,7 +49,7 @@ class SqlTaskRepository:
         stmt = (
             select(Task)
             .where(
-                Task.status.in_([status.value for status in QUEUED_TASK_STATUSES | {"assigned", "running"}]),
+                Task.status.in_([status.value for status in QUEUED_TASK_STATUSES] + ["assigned", "running"]),
                 Task.lease_expires_at.is_not(None),
                 Task.lease_expires_at < now,
             )

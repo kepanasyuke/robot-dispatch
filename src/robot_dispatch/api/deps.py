@@ -39,7 +39,7 @@ def get_robot_service(
 
 async def verify_api_key(
     x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
-    settings: Annotated[Settings, Depends(get_settings_dep)] = None,
+    settings: Annotated[Settings | None, Depends(get_settings_dep)] = None,
 ) -> None:
     """Optional API key: enforced only when DISPATCH_API_KEY is configured."""
     if settings and settings.api_key and x_api_key != settings.api_key:

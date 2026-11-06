@@ -149,7 +149,7 @@ class Broker:
             delivery_mode=DeliveryMode.PERSISTENT,
             message_id=message_id,
             headers=_sanitize_headers(headers),
-            expiration=str(expiration_ms) if expiration_ms else None,
+            expiration=expiration_ms,
             timestamp=datetime.now(tz=UTC),
         )
         await target.publish(message, routing_key=routing_key)
@@ -171,7 +171,7 @@ class Broker:
             delivery_mode=DeliveryMode.PERSISTENT,
             message_id=message_id,
             headers=_sanitize_headers(headers),
-            expiration=str(expiration_ms) if expiration_ms else None,
+            expiration=expiration_ms,
             timestamp=datetime.now(tz=UTC),
         )
         await self._channel.default_exchange.publish(message, routing_key=queue)

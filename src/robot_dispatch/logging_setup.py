@@ -4,40 +4,46 @@ import json
 import logging
 import sys
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 
 class StructuredLogger(logging.Logger):
     """Logger that accepts arbitrary keyword fields.
 
-    `logger.info("task dispatched", task_id=..., robot=...)` is valid here: the
-    fields end up in `record.fields` and are rendered by the formatters below.
-    Standard `logging` would reject unknown keyword arguments.
+    `logger.info("task dispatched", task_id=...)` is valid here: the fields end up
+    in `record.fields` and are rendered by the formatters below. Standard
+    `logging` rejects unknown keyword arguments, hence the typed wrappers.
     """
 
-    def _log(  # type: ignore[override]
+    def _emit(
         self,
         level: int,
         msg: object,
         args: tuple[Any, ...],
+        fields: dict[str, Any],
+        *,
         exc_info: Any = None,
-        extra: dict[str, Any] | None = None,
-        stack_info: bool = False,
-        stacklevel: int = 1,
-        **fields: Any,
     ) -> None:
-        payload: dict[str, Any] = dict(extra or {})
-        if fields:
-            payload["fields"] = {**payload.get("fields", {}), **fields}
-        super()._log(
-            level,
-            msg,
-            args,
-            exc_info=exc_info,
-            extra=payload or None,
-            stack_info=stack_info,
-            stacklevel=stacklevel,
-        )
+        extra = {"fields": fields} if fields else None
+        self._log(level, msg, args, exc_info=exc_info, extra=extra)
+
+    def debug(self, msg: object, *args: Any, **fields: Any) -> None:  # type: ignore[override]
+        self._emit(logging.DEBUG, msg, args, fields)
+
+    def info(self, msg: object, *args: Any, exc_info: Any = None, **fields: Any) -> None:  # type: ignore[override]
+        self._emit(logging.INFO, msg, args, fields, exc_info=exc_info)
+
+    def warning(self, msg: object, *args: Any, exc_info: Any = None, **fields: Any) -> None:  # type: ignore[override]
+        self._emit(logging.WARNING, msg, args, fields, exc_info=exc_info)
+
+    def error(self, msg: object, *args: Any, exc_info: Any = None, **fields: Any) -> None:  # type: ignore[override]
+        self._emit(logging.ERROR, msg, args, fields, exc_info=exc_info)
+
+    def critical(self, msg: object, *args: Any, exc_info: Any = None, **fields: Any) -> None:  # type: ignore[override]
+        self._emit(logging.CRITICAL, msg, args, fields, exc_info=exc_info)
+
+    def exception(self, msg: object, *args: Any, exc_info: Any = True, **fields: Any) -> None:  # type: ignore[override]
+        self._emit(logging.ERROR, msg, args, fields, exc_info=exc_info)
 
 
 logging.setLoggerClass(StructuredLogger)
@@ -98,4 +104,4 @@ def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
 
 
 def get_logger(name: str) -> StructuredLogger:
-    return logging.getLogger(f"robot_dispatch.{name}")  # type: ignore[return-value]
+    return cast(StructuredLogger, logging.getLogger(f"robot_dispatch.{name}"))

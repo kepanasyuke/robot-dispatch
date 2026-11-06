@@ -1,168 +1,110 @@
 # robot-dispatch
 
-Сервис диспетчеризации задач для флота ROS2-роботов: постановка задач, назначение на свободных роботов,
-контроль исполнения, восстановление после отказов и интеграция с внешними системами через RabbitMQ и HTTP.
+Монорепозиторий backend-проектов для команды разработки роботов: диспетчеризация задач,
+телеметрия, мост к ROS2, gRPC-плоскость управления, мониторинг флота и интеграция с WMS заказчика.
 
-Проект собран под вакансию backend-разработчика в команду роботов: серверная часть диспетчеризации,
-надёжная постановка задач с таймаутами/повторами/переназначением, хранение состояния, мониторинг,
-проектирование REST API и протокола обмена с ROS2-стеком.
-
-```
-Заказчик / WMS ──HTTP──▶ API (FastAPI) ──▶ PostgreSQL
-                                            │
-                                   outbox (одна транзакция с задачей)
-                                            │
-                                  OutboxRelay ──▶ RabbitMQ ──command.<robot_id>──▶ робот (ROS2)
-                                                     ▲                               │
-                                                     └──── result.<robot_id> ◀────────┘
-                                                     ▲
-                                            Consumer ──▶ статусы, ретраи, DLQ
-```
-
-## Соответствие требованиям вакансии
-
-| Требование | Где реализовано |
-|---|---|
-| Сервер на Python (FastAPI) | `src/robot_dispatch/main.py`, `api/routers/*` |
-| Брокеры сообщений (RabbitMQ) | `messaging/broker.py` — exchanges, per-robot очереди, DLQ, retry-очередь |
-| Распределённые и event-driven системы | outbox, lease-модель, идемпотентность, `SKIP LOCKED` |
-| Надёжная постановка задач (таймауты, повторы, переназначение) | `services/dispatcher.py` (LeaseReaper), `domain/policies.py` |
-| Хранение состояния и мониторинг | `db/models.py` (task + event log), `GET /api/v1/stats`, `GET /health/ready` |
-| Интеграции через RabbitMQ и HTTP | `messaging/*`, REST API с идемпотентным созданием |
-| Проектирование интерфейса сервер ↔ ROS2 | `messaging/messages.py` (контракт команд/результатов), `mock_ros2/robot_sim.py` |
-| REST/gRPC API | REST + OpenAPI (`/docs`); gRPC — см. «Что дальше» |
-| PostgreSQL, Redis, Docker, Git, Linux | PostgreSQL в compose, Redis-leader-lock, `docker-compose.yml`, CI |
-| Паттерны отказоустойчивости | таблица ниже |
-
-## Жизненный цикл задачи
+Каждый проект самостоятелен, но они складываются в одну систему: робот шлёт телеметрию →
+монитор поднимает алерты → диспетчер ставит задачи → мост отдаёт команды в ROS2 → результаты
+возвращаются в диспетчер → WMS получает статусы.
 
 ```
-pending ──▶ assigned ──▶ running ──▶ succeeded
-   │            │            │
-   │            │            └──▶ failed          (попытки исчерпаны)
-   │            └──▶ retrying ──▶ assigned        (робот не ответил / вернул ошибку)
-   └──▶ cancelled
+WMS ──HTTP──▶ wms-integration ──▶ robot-dispatch ──command──▶ ros2-bridge ──▶ ROS2
+                                       ▲   │
+                                       │   └──outbox──▶ RabbitMQ
+                                       │
+telemetry-hub ◀──MQTT── роботы    fleet-monitor ──▶ Prometheus
+                                       ▲
+                          grpc-fleet-api (fleet control plane)
 ```
 
-Переходы валидируются в одном месте — `domain/state_machine.py`. Любая попытка «воскресить»
-завершённую задачу падает с `InvalidTransition`, а не портит данные.
+## Проекты
 
-## Паттерны отказоустойчивости
+| Проект | Что демонстрирует | Стек | Тесты |
+|---|---|---|---|
+| [robot-dispatch](src/robot_dispatch) | диспетчеризация: очередь задач, lease-восстановление, транзакционный outbox, REST API | FastAPI, PostgreSQL, RabbitMQ, Redis | 70 |
+| [telemetry-hub](projects/telemetry-hub) | ingest MQTT с дедупликацией, порядком и backpressure, rolling-агрегаты | FastAPI, pydantic, aio-pika (MQTT) | 23 |
+| [ros2-bridge](projects/ros2-bridge) | контракт сервер ↔ ROS2: топики, нормализация единиц, дедуп команд, таймауты фидбэка | pydantic, asyncio | 22 |
+| [grpc-fleet-api](projects/grpc-fleet-api) | gRPC-плоскость: канонические статус-коды, идемпотентный `DispatchTask`, интерцептор метрик | grpcio, protobuf | 15 |
+| [fleet-monitor](projects/fleet-monitor) | правила алертов с гистерезисом, жизненный цикл open/acked/resolved, Prometheus | FastAPI, Prometheus text | 21 |
+| [wms-integration](projects/wms-integration) | устойчивый HTTP-клиент (retry, circuit breaker), идемпотентный синк заказов, подписанные вебхуки | httpx, HMAC | 22 |
 
-| Отказ | Механизм | Код |
-|---|---|---|
-| Два диспетчера взяли одну задачу | `SELECT ... FOR UPDATE SKIP LOCKED`, батч кандидатов | `repositories/sql.py: lock_ready` |
-| Падение между «назначили» и «опубликовали команду» | транзакционный outbox: задача, состояние робота и сообщение коммитятся вместе | `services/dispatcher.py`, `messaging/outbox_relay.py` |
-| Брокер недоступен | outbox хранит сообщение и повторяет публикацию с backoff | `messaging/outbox_relay.py` |
-| Робот молча умер | lease `lease_expires_at` на попытку, reaper возвращает задачу в очередь | `services/dispatcher.py: LeaseReaper` |
-| Робот вернул ошибку | повтор с экспоненциальной задержкой и потолком, затем `failed` | `domain/policies.py` |
-| Дубликат результата / опоздавший результат прошлой попытки | проверка `command_id`, терминальные статусы игнорируются | `services/results.py` |
-| Повторный POST от заказчика | `external_id` / `Idempotency-Key` + уникальный индекс, ответ 200 вместо 201 | `services/task_service.py`, `api/routers/tasks.py` |
-| Битое сообщение от робота | немедленный dead-letter (реплей не поможет) | `messaging/consumer.py` |
-| Сбой обработчика | доставка в retry-очередь с per-message TTL, затем DLQ | `messaging/consumer.py` |
-| Двойная доставка команды роботу | `command_id` в сообщении, робот дедуплицирует | `mock_ros2/robot_sim.py` |
-| Робот перестал слать heartbeat | watchdog переводит в `offline`, диспетчер его не выбирает | `messaging/outbox_relay.py: HeartbeatWatchdog` |
-
-Отдельно про Redis: он используется только как best-effort leader-lock для диспетчера
-(`infra/redis_lock.py`). Корректность от него не зависит — при недоступном Redis сервис работает
-без блокировки, а уникальность назначения обеспечивает `SKIP LOCKED`.
+Суммарно: **165 тестов**, `ruff` и `mypy` без замечаний, CI на каждый push.
 
 ## Быстрый старт
 
 ```bash
-cp .env.example .env
-docker compose up -d --build      # postgres, rabbitmq, redis, миграции, api, dispatcher, consumer, 2 симулятора роботов
-open http://localhost:8000/docs    # OpenAPI
-open http://localhost:15672        # RabbitMQ UI: dispatch / dispatch
+make install     # или: python scripts/dev.py install
+make check       # ruff + mypy + pytest
+make up          # docker compose: postgres, rabbitmq, redis, api, dispatcher, consumer, 2 робота
 ```
 
-Поставить задачу и посмотреть, как её исполняет симулированный робот:
+`make` — тонкая обёртка над `python scripts/dev.py`; на Windows без GNU make используйте второй вариант,
+команды идентичны.
+
+| Команда | Что делает |
+|---|---|
+| `install` | установить пакет с dev-зависимостями |
+| `lint` / `format` | ruff check / autofix + format |
+| `typecheck` | mypy (73 файла) |
+| `test [путь]` | pytest: всё или конкретный проект |
+| `check` | lint + typecheck + test |
+| `proto` | перегенерация gRPC-стабов (включая `.pyi`) |
+| `projects` | список проектов репозитория |
+| `up` / `down` / `logs` / `migrate` / `sim` | docker-compose и локальный симулятор флота |
 
 ```bash
-curl -s -X POST localhost:8000/api/v1/tasks \
-  -H 'Content-Type: application/json' \
-  -d '{"type":"delivery","payload":{"to":"warehouse-a","order":"A-100"},"priority":200,"external_id":"order-A-100"}'
-
-curl -s localhost:8000/api/v1/tasks | jq
-curl -s localhost:8000/api/v1/stats | jq
+python scripts/dev.py test projects/ros2-bridge
+python scripts/dev.py projects
 ```
 
-Повторный запрос с тем же `external_id` (или с заголовком `Idempotency-Key`) вернёт **ту же** задачу
-со статусом 200 и заголовком `Idempotent-Replay: true` — без второй задачи в очереди.
+## robot-dispatch: ключевые решения
 
-### Локально без Docker
+| Отказ | Механизм |
+|---|---|
+| Два диспетчера взяли одну задачу | `SELECT ... FOR UPDATE SKIP LOCKED` |
+| Падение между назначением и публикацией | транзакционный outbox: задача + состояние робота + команда в одной транзакции |
+| Брокер недоступен | outbox повторяет публикацию с backoff |
+| Робот молча умер | lease на попытку, `LeaseReaper` возвращает задачу в очередь |
+| Робот вернул ошибку | экспоненциальный backoff с потолком, затем `failed` |
+| Дубликат/опоздавший результат | проверка `command_id`, терминальные статусы игнорируются |
+| Повторный POST заказчика | `external_id` / `Idempotency-Key` + уникальный индекс → 200 вместо 201 |
+| Битое сообщение от робота | немедленный dead-letter |
+| Сбой обработчика | retry-очередь с TTL, затем DLQ |
 
-```bash
-python -m venv .venv
-.venv\Scripts\python -m pip install -e ".[dev]"
-pytest -q
-uvicorn robot_dispatch.main:app --reload     # нужен PostgreSQL по DISPATCH_DATABASE_URL
-```
-
-## API
-
-| Метод | Путь | Назначение |
-|---|---|---|
-| `POST` | `/api/v1/tasks` | создать задачу (идемпотентно по `external_id` / `Idempotency-Key`) |
-| `GET` | `/api/v1/tasks` | список с фильтрами `status`, `type`, `robot_id`, `limit`, `offset` |
-| `GET` | `/api/v1/tasks/{id}` | карточка задачи |
-| `GET` | `/api/v1/tasks/{id}/events` | журнал переходов и отказов (аудит) |
-| `POST` | `/api/v1/tasks/{id}/cancel` | отмена; `runniing`-задачи отменяет только робот → 409 |
-| `POST` | `/api/v1/robots` | регистрация/обновление робота по имени |
-| `GET` | `/api/v1/robots`, `/api/v1/robots/{id}` | состояние флота |
-| `GET` | `/api/v1/stats` | счётчики задач/роботов и глубины очередей |
-| `GET` | `/health/live`, `/health/ready` | liveness / readiness (БД, брокер) |
-
-Если задан `DISPATCH_API_KEY`, все `/api/v1/*` требуют заголовок `X-API-Key`.
-
-## Протокол сервер ↔ ROS2
-
-Обмен идёт через RabbitMQ, контракт описан pydantic-моделями в `messaging/messages.py`.
-
-* `robot.commands` (direct) → очередь `cmd.<robot_id>`, ключ `command.<robot_id>`;
-  тело `CommandMessage`: `command_id`, `task_id`, `task_type`, `attempt`, `timeout_seconds`, `payload`.
-  Сообщение публикуется с TTL, равным таймауту попытки.
-* `robot.events` (topic) ← `result.<robot_id>` и `heartbeat.<robot_id>`;
-  `TaskResultMessage` c `event ∈ {progress, succeeded, failed}`. `progress` продлевает lease,
-  поэтому длинная операция не считается зависшей.
-* `dispatch.results` — очередь сервиса; ошибки уходят в `dispatch.results.retry` (TTL),
-  после исчерпания попыток — в `dispatch.results.dlq`.
-
-Симулятор `mock_ros2/robot_sim.py` реализует ровно эту сторону контракта: регистрируется через API,
-слушает свою очередь, шлёт прогресс, результат и heartbeat, дедуплицирует команды по `command_id`.
-
-## Тесты
-
-```bash
-pytest -q      # 70 тестов, ~2 секунды, без внешних сервисов
-ruff check src tests mock_ros2
-```
-
-Домен, диспетчер, reaper, обработка результатов, outbox-релей, консьюмер и API тестируются
-на in-memory реализации Unit of Work (`repositories/memory.py`), поэтому тесты не требуют
-PostgreSQL и RabbitMQ. SQL-репозитории повторяют тот же контракт (`repositories/protocols.py`).
+Подробности — в разделе «Паттерны отказоустойчивости» [основного README-описания](#) и в коде:
+`src/robot_dispatch/services/dispatcher.py`, `src/robot_dispatch/messaging/outbox_relay.py`.
 
 ## Структура
 
 ```
-src/robot_dispatch/
-  api/            FastAPI-роутеры, схемы, зависимости
-  db/             модели SQLAlchemy, сессия, Unit of Work
-  domain/         статусы, машина состояний, политика ретраев (без I/O)
-  repositories/   SQL- и in-memory-реализации одного контракта
-  services/       TaskService, DispatcherService, LeaseReaper, ResultService
-  messaging/      топология RabbitMQ, публикация, outbox-релей, консьюмер
-  workers/        процессы dispatcher и consumer
-mock_ros2/        симулятор флота роботов
-migrations/       Alembic
-tests/            unit + API тесты
+src/robot_dispatch/        основной сервис диспетчеризации
+  api/  db/  domain/  repositories/  services/  messaging/  workers/  infra/
+mock_ros2/                 симулятор флота (регистрация, команды, прогресс, heartbeat)
+projects/
+  telemetry-hub/           ingest и агрегаты телеметрии
+  ros2-bridge/             мост к ROS2-топикам
+  grpc-fleet-api/          gRPC-контракт и сервер
+  fleet-monitor/           алерты и метрики
+  wms-integration/         клиент и вебхуки WMS
+migrations/                Alembic
+scripts/dev.py             кросс-платформенный раннер (он же — цели Makefile)
+tests/                     тесты основного сервиса
 ```
 
-## Осознанные ограничения
+У каждого проекта в `projects/` есть свой README с деталями контракта и решениями.
 
-* Один робот исполняет одну задачу: `robots.current_task_id`. Пул слотов — расширяемая точка.
-* gRPC-контракт не включён, чтобы не тащить protobuf-генерацию в демо; интерфейс сервисов
-  (`services/*`) от транспорта не зависит — gRPC-адаптер добавляется поверх.
-* Отмена `running`-задачи требует команды `cancel` роботу; в демо API возвращает 409 и просит
-  отменять через робота.
-* Метрики отдаются JSON-эндпоинтом `/api/v1/stats`; Prometheus-экспорт — следующий шаг.
+## Инженерные принципы репозитория
+
+* **Домен отделён от I/O**: статусы и переходы — `domain/`, транспорт — `messaging/`, хранилище — `repositories/`.
+* **Один контракт, две реализации**: SQL и in-memory Unit of Work; тесты не требуют PostgreSQL и RabbitMQ.
+* **Валидация на границе**: pydantic-схемы на входе любого внешнего канала (HTTP, MQTT, gRPC, webhook).
+* **Честная типизация**: `mypy` проходит по 73 файлам, включая сгенерированные gRPC-стабы через `.pyi`.
+* **Тесты как документация отказов**: каждый сценарий (stale lease, replay вебхука, half-open breaker)
+  воспроизводится детерминированно.
+
+## Что дальше
+
+* gRPC-адаптер для `robot-dispatch` поверх тех же сервисов (транспорт уже отделён).
+* Prometheus-экспорт метрик диспетчера (сейчас `/api/v1/stats`).
+* Пул слотов на робота вместо `current_task_id`.
+* Интеграционные тесты с testcontainers на PostgreSQL и RabbitMQ.

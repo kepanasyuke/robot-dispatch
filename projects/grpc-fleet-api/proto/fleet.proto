@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package fleet.v1;
+
+// Fleet control plane exposed to the dispatch service and the operator UI.
+service FleetService {
+  rpc GetRobot(GetRobotRequest) returns (Robot);
+  rpc ListRobots(ListRobotsRequest) returns (ListRobotsResponse);
+  rpc ReportHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc DispatchTask(DispatchTaskRequest) returns (DispatchTaskResponse);
+}
+
+message Robot {
+  string id = 1;
+  string name = 2;
+  // idle | busy | offline
+  string status = 3;
+  repeated string capabilities = 4;
+  double battery_percent = 5;
+  int64 last_seen_unix_ms = 6;
+}
+
+message GetRobotRequest {
+  string robot_id = 1;
+}
+
+message ListRobotsRequest {
+  // Empty string means "any status".
+  string status = 1;
+  int32 limit = 2;
+}
+
+message ListRobotsResponse {
+  repeated Robot robots = 1;
+}
+
+message HeartbeatRequest {
+  string robot_id = 1;
+  string status = 2;
+  double battery_percent = 3;
+  int64 at_unix_ms = 4;
+}
+
+message HeartbeatResponse {
+  bool accepted = 1;
+  int64 server_time_unix_ms = 2;
+}
+
+message DispatchTaskRequest {
+  string task_id = 1;
+  // Idempotency key: a repeated command_id must not create a second assignment.
+  string command_id = 2;
+  string task_type = 3;
+  // Optional preferred robot; empty means "pick any idle robot with the capability".
+  string robot_id = 4;
+  int32 timeout_seconds = 5;
+}
+
+message DispatchTaskResponse {
+  string command_id = 1;
+  bool duplicate = 2;
+  string assigned_robot_id = 3;
+}
