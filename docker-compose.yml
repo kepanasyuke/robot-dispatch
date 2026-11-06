@@ -1,0 +1,117 @@
+name: robot-dispatch
+
+x-app: &app
+  build:
+    context: .
+  image: robot-dispatch:local
+  environment: &app-env
+    DISPATCH_ENVIRONMENT: docker
+    DISPATCH_LOG_LEVEL: INFO
+    DISPATCH_DATABASE_URL: postgresql+asyncpg://dispatch:dispatch@postgres:5432/dispatch
+    DISPATCH_RABBITMQ_URL: amqp://dispatch:dispatch@rabbitmq:5672/
+    DISPATCH_REDIS_URL: redis://redis:6379/0
+    DISPATCH_DEFAULT_TASK_TIMEOUT_SECONDS: "30"
+    DISPATCH_RETRY_BASE_DELAY_SECONDS: "3"
+    DISPATCH_ROBOT_OFFLINE_AFTER_SECONDS: "20"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dispatch
+      POSTGRES_PASSWORD: dispatch
+      POSTGRES_DB: dispatch
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dispatch -d dispatch"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: dispatch
+      RABBITMQ_DEFAULT_PASS: dispatch
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbit-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    command: ["uvicorn", "robot_dispatch.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  dispatcher:
+    <<: *app
+    command: ["python", "-m", "robot_dispatch.workers.dispatcher_worker"]
+
+  consumer:
+    <<: *app
+    command: ["python", "-m", "robot_dispatch.workers.consumer_worker"]
+
+  robot-sim:
+    <<: *app
+    command:
+      [
+        "python",
+        "-m",
+        "mock_ros2.robot_sim",
+        "--api-url",
+        "http://api:8000",
+        "--amqp-url",
+        "amqp://dispatch:dispatch@rabbitmq:5672/",
+        "--count",
+        "2",
+        "--work-seconds",
+        "6",
+        "--failure-rate",
+        "0.2",
+      ]
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  pg-data:
+  rabbit-data:
