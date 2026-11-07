@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Render the gameplay GIF for the README.
 
-The game renders a deterministic mid-game frame for `?embed=1&demo=<seconds>`,
+The game renders a deterministic mid-game frame for `?embed=1&demo=<seconds>&freeze=1`,
 so a sequence of headless-browser screenshots becomes an animation of a real
-play session: robots carry cubes, orders appear and deadlines tick.
+play session: the cleaning robot chases stains, foam flies, deadlines tick.
 
 Requires Chrome or Edge (the same engines already used for manual verification).
 Usage:
@@ -49,7 +49,7 @@ def find_browser() -> str:
 
 
 def capture(browser: str, moment: float, destination: Path, profile: Path) -> Image.Image:
-    url = f"{GAME.as_uri()}?embed=1&demo={moment}"
+    url = f"{GAME.as_uri()}?embed=1&freeze=1&demo={moment}"
     base = [
         browser,
         "--headless=new",
