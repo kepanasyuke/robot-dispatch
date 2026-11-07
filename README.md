@@ -53,7 +53,7 @@
 
 <p align="center">
   <a href="https://kepanasyuke.github.io/robot-dispatch/game/">
-    <img src="docs/game/gameplay.gif" width="880" alt="Геймплей «Диспетчера роботов»: роботы везут кубики-заказы, кольца показывают дедлайн">
+    <img src="docs/game/gameplay.gif" width="880" alt="Геймплей «Диспетчера роботов»: глянцевые роботы везут посылки-заказы, кольца показывают дедлайн">
   </a>
 </p>
 

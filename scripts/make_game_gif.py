@@ -48,19 +48,34 @@ def find_browser() -> str:
     raise SystemExit("Chrome or Edge is required to render the gameplay GIF")
 
 
-def capture(browser: str, moment: float, destination: Path) -> Image.Image:
+def capture(browser: str, moment: float, destination: Path, profile: Path) -> Image.Image:
     url = f"{GAME.as_uri()}?embed=1&demo={moment}"
-    command = [
+    base = [
         browser,
         "--headless=new",
         "--disable-gpu",
         "--hide-scrollbars",
+        f"--user-data-dir={profile}",
+        "--no-first-run",
+        "--no-default-browser-check",
         f"--window-size={WIDTH},{HEIGHT}",
         "--virtual-time-budget=2000",
-        f"--screenshot={destination}",
-        url,
     ]
-    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    last_error: subprocess.CalledProcessError | None = None
+    for _ in range(3):
+        try:
+            subprocess.run(
+                [*base, f"--screenshot={destination}", url],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            last_error = None
+            break
+        except subprocess.CalledProcessError as error:
+            last_error = error
+    if last_error is not None:
+        raise last_error
     image = Image.open(destination).convert("RGB")
     if image.size != (WIDTH, HEIGHT):
         image = image.crop((0, 0, WIDTH, HEIGHT))
@@ -71,15 +86,29 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Render docs/game/gameplay.gif")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--duration-ms", type=int, default=380)
+    parser.add_argument("--colors", type=int, default=200, help="palette size; 0 keeps true color")
+    parser.add_argument(
+        "--width", type=int, default=880, help="output width in pixels; 0 keeps the capture size"
+    )
     args = parser.parse_args(argv)
 
     browser = find_browser()
     frames: list[Image.Image] = []
     with tempfile.TemporaryDirectory() as tmp:
+        profile = Path(tmp) / "profile"
+        profile.mkdir()
         for index, moment in enumerate(FRAME_TIMES):
             frame_path = Path(tmp) / f"frame-{index:02d}.png"
-            frames.append(capture(browser, moment, frame_path))
+            frames.append(capture(browser, moment, frame_path, profile))
             print(f"  captured t={moment:.1f}s")
+
+    if args.width and args.width != WIDTH:
+        height = round(HEIGHT * args.width / WIDTH)
+        frames = [frame.resize((args.width, height), Image.LANCZOS) for frame in frames]
+
+    if args.colors:
+        base = frames[0].quantize(colors=args.colors, method=Image.MEDIANCUT, dither=Image.Dither.NONE)
+        frames = [base] + [frame.quantize(palette=base, dither=Image.Dither.NONE) for frame in frames[1:]]
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     frames[0].save(
@@ -91,7 +120,11 @@ def main(argv: list[str] | None = None) -> int:
         optimize=True,
     )
     size_kb = args.out.stat().st_size / 1024
-    print(f"wrote {args.out.relative_to(ROOT)} ({len(frames)} frames, {size_kb:.0f} KB)")
+    try:
+        shown = args.out.resolve().relative_to(ROOT)
+    except ValueError:
+        shown = args.out
+    print(f"wrote {shown} ({len(frames)} frames, {size_kb:.0f} KB)")
     return 0
 
 
