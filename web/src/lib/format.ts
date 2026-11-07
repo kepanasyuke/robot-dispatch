@@ -38,7 +38,7 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-export function formatDateTime(iso: string | null | undefined): string {
+export function formatDateTime(iso: string | null | undefined, timeZone?: string): string {
   if (!iso) {
     return "—";
   }
@@ -52,6 +52,7 @@ export function formatDateTime(iso: string | null | undefined): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   }).format(date);
 }
 
