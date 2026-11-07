@@ -7,80 +7,100 @@
 <meta name="description" content="Мини-игра про диспетчеризацию: назначайте роботов на заказы, следите за зарядом и сроками.">
 <style>
   :root {
-    color-scheme: dark;
-    --bg: #0b1220;
-    --panel: #111a2e;
-    --panel-border: #22304a;
-    --card: #0f1830;
-    --text: #e9f0fb;
-    --muted: #8ea3c4;
-    --accent: #34d399;
-    --amber: #fbbf24;
-    --danger: #f87171;
-    --violet: #a78bfa;
+    color-scheme: light;
+    --sky: #c9e9ff;
+    --sky-2: #f2fbff;
+    --ink: #22304a;
+    --ink-soft: #5a6b8a;
+    --panel: #ffffff;
+    --cream: #fff8e7;
+    --accent: #0fb1a3;
+    --accent-dark: #087c72;
+    --amber: #ffb703;
+    --danger: #ff5d5d;
+    --violet: #8b5cf6;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
-    background: radial-gradient(1200px 600px at 20% -10%, #12203a 0%, var(--bg) 55%);
-    color: var(--text);
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(900px 420px at 12% -10%, #ffffff 0%, rgba(255, 255, 255, 0) 60%),
+      linear-gradient(180deg, var(--sky) 0%, var(--sky-2) 62%);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     padding: 28px 16px 40px;
   }
   .shell { max-width: 1020px; margin: 0 auto; }
-  header h1 { margin: 0 0 8px; font-size: clamp(24px, 3.6vw, 34px); letter-spacing: -0.01em; }
-  header p { margin: 0; color: var(--muted); max-width: 70ch; line-height: 1.5; font-size: 15px; }
+  header h1 {
+    margin: 0 0 8px; font-size: clamp(26px, 4vw, 38px); font-weight: 800; letter-spacing: -0.02em;
+    text-shadow: 0 2px 0 #ffffff, 0 4px 0 rgba(34, 48, 74, .12);
+  }
+  header p { margin: 0; color: var(--ink-soft); max-width: 70ch; line-height: 1.55; font-size: 15px; }
   .hud {
     display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch;
     margin: 20px 0 12px;
   }
   .stat {
-    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px;
+    background: var(--panel); border: 3px solid var(--ink); border-radius: 16px;
     padding: 8px 14px; min-width: 104px; display: flex; flex-direction: column; gap: 2px;
+    box-shadow: 0 4px 0 rgba(34, 48, 74, .22);
   }
-  .stat .k { color: var(--muted); font-size: 12px; letter-spacing: .02em; }
-  .stat strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .stat .k { color: var(--ink-soft); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; }
+  .stat strong { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .stat.lives strong { color: var(--danger); }
   .registry { display: flex; gap: 8px; margin: 0 0 12px; flex-wrap: wrap; }
   .chip {
-    background: var(--panel); border: 1px solid var(--panel-border); border-radius: 999px;
-    padding: 6px 12px; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center;
+    background: var(--cream); border: 2px solid var(--ink); border-radius: 999px;
+    padding: 5px 12px; font-size: 13px; color: var(--ink-soft); display: flex; gap: 8px; align-items: center;
+    box-shadow: 0 3px 0 rgba(34, 48, 74, .16);
   }
-  .chip b { color: var(--text); font-weight: 600; }
-  .chip .bar { width: 56px; height: 6px; border-radius: 3px; background: #1b2740; overflow: hidden; }
-  .chip .bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
-  .chip.low .bar span { background: var(--amber); }
-  .chip.dead .bar span { background: var(--danger); }
+  .chip b { color: var(--ink); font-weight: 800; }
+  .chip .bar {
+    width: 56px; height: 8px; border-radius: 5px; background: #e3ebf5;
+    border: 1.5px solid var(--ink); overflow: hidden;
+  }
+  .chip .bar span { display: block; height: 100%; background: linear-gradient(180deg, #3ee0cf, var(--accent)); }
+  .chip.low .bar span { background: linear-gradient(180deg, #ffd15c, var(--amber)); }
+  .chip.dead .bar span { background: linear-gradient(180deg, #ff8f8f, var(--danger)); }
   .actions { margin-left: auto; display: flex; gap: 8px; }
   button {
-    font: inherit; color: var(--text); background: #16233b; border: 1px solid #2b3b57;
-    border-radius: 10px; padding: 9px 16px; cursor: pointer; transition: border-color .15s, transform .05s;
+    font: inherit; font-weight: 800; color: var(--ink);
+    background: linear-gradient(180deg, #ffffff 0%, #ffe9b3 55%, #ffd166 100%);
+    border: 3px solid var(--ink); border-radius: 14px; padding: 8px 18px; cursor: pointer;
+    box-shadow: 0 4px 0 rgba(34, 48, 74, .35), inset 0 2px 0 rgba(255, 255, 255, .9);
+    transition: transform .06s ease, box-shadow .06s ease;
   }
-  button:hover { border-color: var(--accent); }
-  button:active { transform: translateY(1px); }
-  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .stage { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--panel-border); background: var(--card); }
+  button:hover { transform: translateY(-1px); box-shadow: 0 5px 0 rgba(34, 48, 74, .35), inset 0 2px 0 rgba(255, 255, 255, .9); }
+  button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(34, 48, 74, .35), inset 0 2px 0 rgba(255, 255, 255, .9); }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .stage {
+    position: relative; border-radius: 20px; overflow: hidden; border: 3px solid var(--ink);
+    background: var(--sky-2); box-shadow: 0 8px 0 rgba(34, 48, 74, .22), 0 18px 40px rgba(34, 48, 74, .18);
+  }
   canvas { display: block; width: 100%; height: auto; touch-action: manipulation; }
   .overlay {
     position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; text-align: center;
-    background: rgba(6, 11, 22, .82); backdrop-filter: blur(2px); padding: 24px;
+    background: rgba(255, 255, 255, .88); backdrop-filter: blur(3px); padding: 24px;
   }
   .overlay[hidden] { display: none; }
-  .overlay h2 { margin: 0; font-size: 28px; }
-  .overlay p { margin: 0; color: var(--muted); }
-  footer { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+  .overlay h2 { margin: 0; font-size: 30px; font-weight: 800; text-shadow: 0 2px 0 #fff; }
+  .overlay p { margin: 0; color: var(--ink-soft); font-weight: 600; }
+  footer { margin-top: 14px; color: var(--ink-soft); font-size: 13px; line-height: 1.6; }
   footer p { margin: 0 0 6px; }
-  footer strong { color: var(--text); font-weight: 600; }
+  footer strong { color: var(--ink); font-weight: 800; }
+  footer a { color: var(--accent-dark); font-weight: 700; }
   kbd {
-    background: #16233b; border: 1px solid #2b3b57; border-bottom-width: 2px; border-radius: 6px;
-    padding: 1px 6px; font-family: Consolas, monospace; font-size: 12px; color: var(--text);
+    background: var(--cream); border: 2px solid var(--ink); border-bottom-width: 4px; border-radius: 7px;
+    padding: 0 6px; font-family: Consolas, monospace; font-size: 12px; color: var(--ink);
   }
   #selftest {
-    white-space: pre-wrap; background: #0d1526; border: 1px solid var(--panel-border);
-    border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-family: Consolas, monospace; font-size: 12px;
+    white-space: pre-wrap; background: var(--cream); border: 3px solid var(--ink);
+    border-radius: 12px; padding: 10px 12px; margin-top: 12px; font-family: Consolas, monospace; font-size: 12px;
+    color: var(--ink);
   }
-  body.embed { padding: 0; background: var(--bg); min-height: 0; }
+  body.embed { padding: 0; background: var(--sky-2); min-height: 0; }
   body.embed .shell { max-width: none; }
   body.embed header,
   body.embed .hud,
@@ -155,27 +175,47 @@
   const H = canvas.height;
 
   const COLORS = {
-    bg: '#0b1220',
-    grid: '#141f33',
-    shelf: '#16233b',
+    bg: '#dff2ff',
+    grid: 'rgba(255, 255, 255, 0.75)',
+    shelf: '#ffe6b0',
     shelfEdge: '#22304a',
-    text: '#e9f0fb',
-    muted: '#8ea3c4',
-    accent: '#34d399',
-    amber: '#fbbf24',
-    danger: '#f87171',
-    violet: '#a78bfa',
-    drop: '#7c5cff',
+    text: '#22304a',
+    muted: '#5a6b8a',
+    accent: '#0fb1a3',
+    accentDark: '#087c72',
+    amber: '#ffb703',
+    amberDark: '#c98700',
+    danger: '#ff5d5d',
+    dangerDark: '#c33a3a',
+    violet: '#8b5cf6',
+    drop: '#8b5cf6',
+    ink: '#22304a',
+    cream: '#fff8e7',
+    white: '#ffffff',
+    floor: '#d8efff',
+    floorLine: 'rgba(255, 255, 255, 0.9)',
+    metal: '#cfe3f5',
+    metalDark: '#9fb8d0',
   };
 
-  const ROBOT_R = 17;
+  const ROBOT_R = 21;
   const SPEED = 170;
   const DRAIN = 2.4;
   const CHARGE = 26;
   const LOW_BATTERY = 25;
   const CHARGE_TO = 85;
   const MAX_ATTEMPTS = 3;
-  const DROP = { x: W - 110, y: H - 62, w: 170, h: 96 };
+  const DROP = { x: W - 110, y: H - 96, w: 156, h: 88 };
+  const PARKING = [
+    { x: DROP.x - 205, y: DROP.y - 54 },
+    { x: DROP.x - 205, y: DROP.y - 14 },
+    { x: DROP.x - 205, y: DROP.y + 26 },
+  ];
+  const CHARGE_BAY = [
+    { x: DROP.x - 300, y: DROP.y - 54 },
+    { x: DROP.x - 300, y: DROP.y - 14 },
+    { x: DROP.x - 300, y: DROP.y + 26 },
+  ];
   const SPAWN_POINTS = [
     { x: 170, y: 130 }, { x: 320, y: 170 }, { x: 470, y: 120 },
     { x: 620, y: 170 }, { x: 760, y: 120 }, { x: 250, y: 260 },
@@ -222,9 +262,9 @@
     return {
       seed,
       robots: [
-        { id: 0, name: 'R1', x: 110, y: 230, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
-        { id: 1, name: 'R2', x: 110, y: 330, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
-        { id: 2, name: 'R3', x: 110, y: 430, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
+        { id: 0, name: 'R1', x: PARKING[0].x, y: PARKING[0].y, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
+        { id: 1, name: 'R2', x: PARKING[1].x, y: PARKING[1].y, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
+        { id: 2, name: 'R3', x: PARKING[2].x, y: PARKING[2].y, battery: 100, state: 'idle', order: null, target: null, timer: 0, heading: 0 },
       ],
       orders: [],
       floats: [],
@@ -364,8 +404,8 @@
     robot.state = 'idle';
     robot.target = null;
     robot.battery = Math.max(0, robot.battery - 3);
-    robot.x = DROP.x - 120;
-    robot.y = DROP.y - 4;
+    robot.x = PARKING[robot.id].x;
+    robot.y = PARKING[robot.id].y;
     game.orders = game.orders.filter((item) => item !== order);
   }
 
@@ -381,8 +421,8 @@
       robot.timer -= dt;
       if (robot.timer <= 0) {
         robot.state = 'charging';
-        robot.x = DROP.x - 132;
-        robot.y = DROP.y - 8;
+        robot.x = CHARGE_BAY[robot.id].x;
+        robot.y = CHARGE_BAY[robot.id].y;
         robot.battery = 30;
       }
       return;
@@ -390,7 +430,7 @@
 
     if (robot.state === 'idle' && robot.battery < LOW_BATTERY) {
       robot.state = 'toCharger';
-      robot.target = { x: DROP.x - 132, y: DROP.y - 8 };
+      robot.target = { x: CHARGE_BAY[robot.id].x, y: CHARGE_BAY[robot.id].y };
       flash(`${robot.name}: низкий заряд, едет заряжаться`);
       return;
     }
@@ -499,121 +539,309 @@
     ctx.closePath();
   }
 
-  function drawCube(x, y, size, top, left, right, alpha = 1) {
-    const half = size * 0.5;
+  function drawParcel(x, y, size, alpha = 1) {
+    const halfW = size;
+    const halfH = size * 0.48;
+    const height = size * 0.82;
     ctx.save();
     ctx.globalAlpha = alpha;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = COLORS.ink;
 
     ctx.beginPath();
-    ctx.moveTo(x, y - half);
-    ctx.lineTo(x + size, y);
-    ctx.lineTo(x, y + half);
-    ctx.lineTo(x - size, y);
+    ctx.moveTo(x - halfW, y);
+    ctx.lineTo(x, y + halfH);
+    ctx.lineTo(x, y + halfH + height);
+    ctx.lineTo(x - halfW, y + height);
     ctx.closePath();
-    ctx.fillStyle = top;
+    ctx.fillStyle = COLORS.amberDark;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x + halfW, y);
+    ctx.lineTo(x, y + halfH);
+    ctx.lineTo(x, y + halfH + height);
+    ctx.lineTo(x + halfW, y + height);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.amber;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x, y - halfH);
+    ctx.lineTo(x + halfW, y);
+    ctx.lineTo(x, y + halfH);
+    ctx.lineTo(x - halfW, y);
+    ctx.closePath();
+    ctx.fillStyle = '#ffd88a';
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x - halfW * 0.55, y - halfH * 0.45);
+    ctx.lineTo(x + halfW * 0.45, y - halfH * 0.05);
+    ctx.lineTo(x + halfW * 0.25, y + halfH * 0.15);
+    ctx.lineTo(x - halfW * 0.75, y - halfH * 0.25);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.cream;
     ctx.fill();
 
     ctx.beginPath();
-    ctx.moveTo(x - size, y);
-    ctx.lineTo(x, y + half);
-    ctx.lineTo(x, y + half + size);
-    ctx.lineTo(x - size, y + size);
+    ctx.moveTo(x - halfW * 0.42, y - halfH * 0.36);
+    ctx.lineTo(x - halfW * 0.02, y - halfH * 0.2);
+    ctx.lineTo(x - halfW * 0.16, y - halfH * 0.08);
+    ctx.lineTo(x - halfW * 0.56, y - halfH * 0.24);
     ctx.closePath();
-    ctx.fillStyle = left;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(x + size, y);
-    ctx.lineTo(x, y + half);
-    ctx.lineTo(x, y + half + size);
-    ctx.lineTo(x + size, y + size);
-    ctx.closePath();
-    ctx.fillStyle = right;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.fill();
     ctx.restore();
   }
 
   function drawBackground() {
-    ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0, 0, W, H);
+    const wall = ctx.createLinearGradient(0, 0, 0, 110);
+    wall.addColorStop(0, '#f4fbff');
+    wall.addColorStop(1, '#cbe7fb');
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, W, 110);
+
+    const floor = ctx.createLinearGradient(0, 96, 0, H);
+    floor.addColorStop(0, '#d9efff');
+    floor.addColorStop(1, '#a9d7f2');
+    ctx.fillStyle = floor;
+    ctx.fillRect(0, 96, W, H - 96);
 
     ctx.strokeStyle = COLORS.grid;
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= W; x += 60) {
+    ctx.lineWidth = 2;
+    for (let x = 0; x <= W; x += 64) {
       ctx.beginPath();
-      ctx.moveTo(x + 0.5, 0);
-      ctx.lineTo(x + 0.5, H);
+      ctx.moveTo(x, 96);
+      ctx.lineTo(x, H);
       ctx.stroke();
     }
-    for (let y = 0; y <= H; y += 60) {
+    for (let y = 96; y <= H; y += 64) {
       ctx.beginPath();
-      ctx.moveTo(0, y + 0.5);
-      ctx.lineTo(W, y + 0.5);
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
       ctx.stroke();
     }
 
+    ctx.strokeStyle = 'rgba(34, 48, 74, 0.12)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, 96);
+    ctx.lineTo(W, 96);
+    ctx.stroke();
+
     const shelves = [
-      [60, 80, 200, 18], [300, 120, 160, 18], [500, 90, 180, 18],
-      [60, 300, 120, 18], [620, 220, 150, 18], [300, 400, 140, 18],
+      [60, 74, 196, 26], [300, 112, 156, 26], [500, 82, 176, 26],
+      [62, 300, 118, 24], [622, 214, 146, 24], [300, 402, 138, 24],
     ];
-    ctx.fillStyle = COLORS.shelf;
     for (const [x, y, w, h] of shelves) {
-      roundedRect(x, y, w, h, 6);
+      ctx.save();
+      ctx.fillStyle = 'rgba(34, 48, 74, 0.14)';
+      roundedRect(x + 3, y + 5, w, h, 9);
       ctx.fill();
+
+      const board = ctx.createLinearGradient(0, y, 0, y + h);
+      board.addColorStop(0, '#ffe9ae');
+      board.addColorStop(1, COLORS.shelf);
+      ctx.beginPath();
+      roundedRect(x, y, w, h, 9);
+      ctx.fillStyle = board;
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.stroke();
+
+      const cargoColors = ['#ff8f6b', '#7fd6ff', '#c9a4ff', '#8ef0b6'];
+      const count = 3;
+      for (let i = 0; i < count; i += 1) {
+        const cx = x + 18 + i * ((w - 36) / Math.max(1, count - 1));
+        const cw = 20;
+        const ch = 16 + ((i * 7 + x) % 9);
+        ctx.beginPath();
+        roundedRect(cx - cw / 2, y - ch + 2, cw, ch, 4);
+        ctx.fillStyle = cargoColors[(i + Math.round(x / 60)) % cargoColors.length];
+        ctx.fill();
+        ctx.lineWidth = 2.4;
+        ctx.strokeStyle = COLORS.ink;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    const vignette = ctx.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H * 0.95);
+    vignette.addColorStop(0, 'rgba(34, 48, 74, 0)');
+    vignette.addColorStop(1, 'rgba(34, 48, 74, 0.16)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawChargers() {
+    const bays = CHARGE_BAY.slice(0, game.robots.length);
+    if (!bays.length) return;
+
+    const top = bays[0].y - 24;
+    const bottom = bays[bays.length - 1].y + 24;
+    ctx.save();
+    ctx.fillStyle = 'rgba(34, 48, 74, 0.14)';
+    roundedRect(bays[0].x - 40, top + 4, 80, bottom - top, 14);
+    ctx.fill();
+
+    const base = ctx.createLinearGradient(0, top, 0, bottom);
+    base.addColorStop(0, '#eef8ff');
+    base.addColorStop(1, '#d3e6f5');
+    ctx.beginPath();
+    roundedRect(bays[0].x - 40, top, 80, bottom - top, 14);
+    ctx.fillStyle = base;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.stroke();
+    ctx.restore();
+
+    for (const bay of bays) {
+      ctx.save();
+      const plate = ctx.createLinearGradient(0, bay.y - 15, 0, bay.y + 15);
+      plate.addColorStop(0, '#f0feff');
+      plate.addColorStop(1, '#c9eef4');
+      ctx.beginPath();
+      roundedRect(bay.x - 24, bay.y - 15, 48, 30, 9);
+      ctx.fillStyle = plate;
+      ctx.fill();
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = COLORS.accentDark;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(bay.x + 3, bay.y - 8);
+      ctx.lineTo(bay.x - 5, bay.y + 1);
+      ctx.lineTo(bay.x - 1, bay.y + 1);
+      ctx.lineTo(bay.x - 3, bay.y + 8);
+      ctx.lineTo(bay.x + 5, bay.y - 1);
+      ctx.lineTo(bay.x + 1, bay.y - 1);
+      ctx.closePath();
+      ctx.fillStyle = COLORS.amber;
+      ctx.fill();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
   function drawDropZone() {
     ctx.save();
-    ctx.strokeStyle = COLORS.drop;
-    ctx.fillStyle = 'rgba(124, 92, 255, 0.12)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([7, 6]);
-    roundedRect(DROP.x - DROP.w / 2, DROP.y - DROP.h / 2, DROP.w, DROP.h, 14);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    const x = DROP.x - DROP.w / 2;
+    const y = DROP.y - DROP.h / 2;
 
-    ctx.fillStyle = COLORS.violet;
-    ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(34, 48, 74, 0.16)';
+    roundedRect(x + 4, y + 7, DROP.w, DROP.h, 18);
+    ctx.fill();
+
+    const plate = ctx.createLinearGradient(0, y, 0, y + DROP.h);
+    plate.addColorStop(0, '#fdf4ff');
+    plate.addColorStop(1, '#e6d3ff');
+    ctx.beginPath();
+    roundedRect(x, y, DROP.w, DROP.h, 18);
+    ctx.fillStyle = plate;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = COLORS.violet;
+    ctx.stroke();
+
+    ctx.setLineDash([9, 7]);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.55)';
+    ctx.beginPath();
+    roundedRect(x + 8, y + 8, DROP.w - 16, DROP.h - 16, 13);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    for (const [cx, cy] of [[x + 12, y + 12], [x + DROP.w - 12, y + 12], [x + 12, y + DROP.h - 12], [x + DROP.w - 12, y + DROP.h - 12]]) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3.4, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS.violet;
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = COLORS.ink;
+    ctx.font = '800 13px "Trebuchet MS", system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('погрузка', DROP.x, DROP.y + 4);
+    ctx.fillText('ПОГРУЗКА', DROP.x, y + DROP.h - 14);
+
+    const bob = Math.sin(game.elapsed * 3) * 2;
+    ctx.strokeStyle = COLORS.violet;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 2; i += 1) {
+      const cy = DROP.y - 26 - i * 10 + bob;
+      ctx.beginPath();
+      ctx.moveTo(DROP.x - 12, cy);
+      ctx.lineTo(DROP.x, cy + 8);
+      ctx.lineTo(DROP.x + 12, cy);
+      ctx.stroke();
+    }
     ctx.textAlign = 'left';
+    ctx.restore();
   }
 
   function drawOrder(order) {
     const carrier = order.robot === null ? null : game.robots[order.robot];
     if (carrier && carrier.state === 'toDrop') return;
 
-    const pulse = 1 + Math.sin(game.elapsed * 5 + order.id) * 0.08;
+    const pulse = 1 + Math.sin(game.elapsed * 5 + order.id) * 0.07;
     const remaining = clamp(1 - (game.elapsed - order.born) / order.ttl, 0, 1);
     const assigned = order.robot !== null;
     const color = assigned ? COLORS.accent : remaining > 0.35 ? COLORS.amber : COLORS.danger;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillStyle = 'rgba(34, 48, 74, 0.2)';
     ctx.beginPath();
-    ctx.ellipse(order.x, order.y + 16, 15, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(order.x, order.y + 22, 17, 6, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
 
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = assigned ? 0.55 : 0.9;
-    ctx.lineWidth = 3;
+    ctx.save();
+    ctx.globalAlpha = assigned ? 0.65 : 1;
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = COLORS.ink;
     ctx.beginPath();
-    ctx.arc(order.x, order.y + 2, 23, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining);
+    ctx.arc(order.x, order.y + 2, 25, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining);
+    ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.arc(order.x, order.y + 2, 25, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remaining);
     ctx.stroke();
     ctx.restore();
 
-    const bob = Math.sin(game.elapsed * 4 + order.id) * 2;
-    const alpha = assigned ? 0.85 : 1;
-    drawCube(order.x, order.y - 6 + bob, 12 * pulse, color, '#0f1830', '#0b1220', alpha);
+    const bob = Math.sin(game.elapsed * 4 + order.id) * 2.5;
+    drawParcel(order.x, order.y - 8 + bob, 13 * pulse, assigned ? 0.75 : 1);
 
     if (order.attempts > 1) {
-      ctx.fillStyle = COLORS.amber;
-      ctx.font = '600 10px Consolas, monospace';
+      ctx.save();
+      const text = `${order.attempts}/${MAX_ATTEMPTS}`;
+      ctx.font = '800 10px "Trebuchet MS", system-ui, sans-serif';
+      const badgeW = ctx.measureText(text).width + 14;
+      const badgeY = order.y + 30;
+      ctx.beginPath();
+      roundedRect(order.x - badgeW / 2, badgeY, badgeW, 16, 8);
+      ctx.fillStyle = COLORS.cream;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.stroke();
+      ctx.fillStyle = COLORS.ink;
       ctx.textAlign = 'center';
-      ctx.fillText(`${order.attempts}/${MAX_ATTEMPTS}`, order.x, order.y + 34);
+      ctx.fillText(text, order.x, badgeY + 12);
       ctx.textAlign = 'left';
+      ctx.restore();
     }
   }
 
@@ -622,126 +850,230 @@
     const alive = robot.state !== 'dead';
     const bob = alive ? Math.sin(game.elapsed * (moving ? 7 : 2.4) + robot.id) * (moving ? 1.8 : 1) : 0;
     const battery = clamp(robot.battery, 0, 100) / 100;
+    const low = robot.battery < LOW_BATTERY;
     const color = robot.state === 'dead' ? COLORS.danger
-      : robot.battery < LOW_BATTERY ? COLORS.amber
-      : robot.state === 'idle' ? COLORS.muted
+      : low ? COLORS.amber
+      : robot.state === 'idle' ? COLORS.accent
       : COLORS.accent;
 
     if (robot.state === 'charging') {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(15, 177, 163, 0.35)';
+      ctx.lineWidth = 3;
       const pulse = 10 + Math.sin(game.elapsed * 4) * 3;
-      ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)';
-      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(robot.x, robot.y, ROBOT_R + pulse, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.restore();
     }
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillStyle = 'rgba(34, 48, 74, 0.18)';
     ctx.beginPath();
-    ctx.ellipse(robot.x, robot.y + ROBOT_R + 6, 16, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(robot.x + 2, robot.y + ROBOT_R + 12, 18, 6, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
+    const wobble = moving ? Math.sin(game.elapsed * 10 + robot.id) * 0.045 : 0;
     ctx.save();
     ctx.translate(robot.x, robot.y + bob);
     ctx.rotate(robot.heading + Math.PI / 2);
+    ctx.scale(1 - wobble, 1 + wobble);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
 
     // treads
     const tread = ((game.elapsed * (moving ? 240 : 30)) % 10) / 10;
-    ctx.fillStyle = '#1b2740';
-    roundedRect(-ROBOT_R * 0.95, ROBOT_R * 0.45, ROBOT_R * 0.7, 7, 3);
-    ctx.fill();
-    roundedRect(ROBOT_R * 0.25, ROBOT_R * 0.45, ROBOT_R * 0.7, 7, 3);
-    ctx.fill();
-    ctx.strokeStyle = COLORS.shelfEdge;
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 3; i += 1) {
-      const offset = -ROBOT_R * 0.95 + ROBOT_R * 0.7 * ((tread + i / 3) % 1);
-      ctx.beginPath();
-      ctx.moveTo(offset, ROBOT_R * 0.45);
-      ctx.lineTo(offset, ROBOT_R * 0.45 + 7);
-      ctx.stroke();
+    for (const side of [-1, 1]) {
+      const tx = side * ROBOT_R * 0.62 - ROBOT_R * 0.34;
+      const ty = ROBOT_R * 0.5;
+      ctx.fillStyle = COLORS.ink;
+      roundedRect(tx, ty, ROBOT_R * 0.68, 10, 4);
+      ctx.fill();
+      ctx.fillStyle = COLORS.metalDark;
+      for (let i = 0; i < 3; i += 1) {
+        const offset = tx + 2 + (ROBOT_R * 0.68 - 6) * ((tread + i / 3) % 1);
+        ctx.fillRect(offset, ty + 2, 2, 6);
+      }
     }
 
     // body
-    ctx.fillStyle = robot.state === 'dead' ? '#2a1420' : '#16233b';
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, ROBOT_R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // eyes with blink
-    const blinkPhase = Math.sin(game.elapsed * 1.6 + robot.id * 2.1);
-    const eyeHeight = blinkPhase > 0.97 ? 1 : 3;
-    ctx.fillStyle = color;
-    roundedRect(-8, -5, 5, eyeHeight, 1.5);
-    ctx.fill();
-    roundedRect(3, -5, 5, eyeHeight, 1.5);
-    ctx.fill();
-
-    // antenna
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(0, -ROBOT_R);
-    ctx.lineTo(0, -ROBOT_R - 9);
-    ctx.stroke();
-    const glow = 0.5 + 0.5 * Math.sin(game.elapsed * 6 + robot.id);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, -ROBOT_R - 11, 1.8 + glow * 1.6, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-
-    // battery arc
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(robot.x, robot.y + bob, ROBOT_R + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * battery);
-    ctx.stroke();
-
-    // carried cube
-    if (robot.order) {
-      drawCube(robot.x, robot.y + bob - ROBOT_R - 12, 8, COLORS.amber, '#a16207', '#78350f', 0.95);
-    }
-
-    ctx.fillStyle = COLORS.muted;
-    ctx.font = '600 11px Consolas, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(robot.name, robot.x, Math.min(robot.y + ROBOT_R + 22, H - 6));
-    ctx.textAlign = 'left';
-
+    const bodyW = ROBOT_R * 2.02;
+    const bodyH = ROBOT_R * 2.1;
+    const gradient = ctx.createLinearGradient(0, -bodyH / 2, 0, bodyH / 2);
     if (robot.state === 'dead') {
-      ctx.strokeStyle = COLORS.danger;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(robot.x - 8, robot.y - 8);
-      ctx.lineTo(robot.x + 8, robot.y + 8);
-      ctx.moveTo(robot.x + 8, robot.y - 8);
-      ctx.lineTo(robot.x - 8, robot.y + 8);
+      gradient.addColorStop(0, '#ffd9d9');
+      gradient.addColorStop(1, '#e8a0a0');
+    } else {
+      gradient.addColorStop(0, '#5ff0e0');
+      gradient.addColorStop(0.55, color);
+      gradient.addColorStop(1, COLORS.accentDark);
+    }
+    ctx.beginPath();
+    roundedRect(-bodyW / 2, -bodyH / 2, bodyW, bodyH, ROBOT_R * 0.55);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.stroke();
+
+    // claws
+    ctx.strokeStyle = COLORS.ink;
+    ctx.fillStyle = COLORS.metal;
+    for (const side of [-1, 1]) {
+      roundedRect(side * (bodyW / 2) - (side > 0 ? 0 : 9), -ROBOT_R * 0.32, 9, 7, 3);
+      ctx.fill();
+      ctx.stroke();
+      roundedRect(side * (bodyW / 2) - (side > 0 ? 0 : 9), ROBOT_R * 0.24, 9, 6, 3);
+      ctx.fill();
       ctx.stroke();
     }
 
+    // visor
+    const visorW = bodyW * 0.72;
+    const visorH = bodyH * 0.34;
+    const visorY = -bodyH * 0.34;
+    const visor = ctx.createLinearGradient(0, visorY, 0, visorY + visorH);
+    visor.addColorStop(0, '#eafcff');
+    visor.addColorStop(0.55, '#7fe8ff');
+    visor.addColorStop(1, '#2bb6d9');
+    ctx.beginPath();
+    roundedRect(-visorW / 2, visorY, visorW, visorH, visorH * 0.45);
+    ctx.fillStyle = robot.state === 'dead' ? '#ffb3b3' : visor;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.beginPath();
+    ctx.ellipse(-visorW * 0.24, visorY + visorH * 0.38, visorW * 0.14, visorH * 0.2, -0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // eyes on the visor
+    const blinkPhase = Math.sin(game.elapsed * 1.6 + robot.id * 2.1);
+    const eyeH = blinkPhase > 0.97 ? 1.4 : 4.6;
+    ctx.fillStyle = COLORS.ink;
+    for (const side of [-1, 1]) {
+      roundedRect(side * visorW * 0.19 - 2.4, visorY + visorH * 0.5 - eyeH / 2, 4.8, eyeH, 2.2);
+      ctx.fill();
+    }
+
+    // antenna, offset to the shoulder so the carried parcel stays clear
+    const antennaX = -bodyW * 0.3;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(antennaX, -bodyH / 2 + 2);
+    ctx.lineTo(antennaX - 2, -bodyH / 2 - 10);
+    ctx.stroke();
+    const glow = 0.5 + 0.5 * Math.sin(game.elapsed * 6 + robot.id);
+    ctx.fillStyle = robot.state === 'dead' ? COLORS.danger : COLORS.amber;
+    ctx.beginPath();
+    ctx.arc(antennaX - 2, -bodyH / 2 - 12, 3.4 + glow * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.stroke();
+
+    // body gloss
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(-bodyW * 0.22, -bodyH * 0.18, bodyW * 0.2, bodyH * 0.16, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // charge indicator on the belly
+    const indW = bodyW * 0.64;
+    const indH = 7;
+    const indX = -indW / 2;
+    const indY = bodyH * 0.2;
+    ctx.beginPath();
+    roundedRect(indX, indY, indW, indH, 3.5);
+    ctx.fillStyle = COLORS.cream;
+    ctx.fill();
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.stroke();
+    if (battery > 0.02) {
+      ctx.beginPath();
+      roundedRect(indX + 1.6, indY + 1.6, (indW - 3.2) * battery, indH - 3.2, 2.4);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // battery pill
+    // carried parcel
+    if (robot.order) {
+      drawParcel(robot.x, robot.y + bob - ROBOT_R - 24, 9, 1);
+    }
+
+    // name plate
+    ctx.save();
+    ctx.font = '800 11px "Trebuchet MS", system-ui, sans-serif';
+    const labelY = robot.y + ROBOT_R + 22 > H - 16
+      ? robot.y - ROBOT_R - 42
+      : robot.y + ROBOT_R + 22;
+    const labelW = ctx.measureText(robot.name).width + 16;
+    ctx.beginPath();
+    roundedRect(robot.x - labelW / 2, labelY - 10, labelW, 17, 8);
+    ctx.fillStyle = COLORS.cream;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.stroke();
+    ctx.fillStyle = COLORS.ink;
+    ctx.textAlign = 'center';
+    ctx.fillText(robot.name, robot.x, labelY + 2);
+    ctx.textAlign = 'left';
+    ctx.restore();
+
+    if (robot.state === 'dead') {
+      ctx.save();
+      ctx.strokeStyle = COLORS.dangerDark;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(robot.x - 9, robot.y - 9);
+      ctx.lineTo(robot.x + 9, robot.y + 9);
+      ctx.moveTo(robot.x + 9, robot.y - 9);
+      ctx.lineTo(robot.x - 9, robot.y + 9);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (robot.state === 'charging') {
-      ctx.fillStyle = COLORS.accent;
-      ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚡', robot.x, robot.y - ROBOT_R - 16);
-      ctx.textAlign = 'left';
+      ctx.save();
+      ctx.fillStyle = COLORS.amber;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const bx = robot.x;
+      const by = robot.y - ROBOT_R - 20;
+      ctx.moveTo(bx + 3, by - 8);
+      ctx.lineTo(bx - 5, by + 1);
+      ctx.lineTo(bx, by + 1);
+      ctx.lineTo(bx - 2, by + 9);
+      ctx.lineTo(bx + 6, by - 1);
+      ctx.lineTo(bx + 1, by - 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
   function draw() {
     if (!game) return;
     drawBackground();
+    drawChargers();
     drawDropZone();
 
-    ctx.strokeStyle = 'rgba(52, 211, 153, 0.18)';
-    ctx.lineWidth = 1.5;
+    ctx.save();
+    ctx.setLineDash([6, 8]);
+    ctx.strokeStyle = 'rgba(34, 48, 74, 0.28)';
+    ctx.lineWidth = 2.5;
     for (const robot of game.robots) {
       if (!robot.target) continue;
       ctx.beginPath();
@@ -749,47 +1081,82 @@
       ctx.lineTo(robot.target.x, robot.target.y);
       ctx.stroke();
     }
+    ctx.restore();
 
     for (const order of game.orders) drawOrder(order);
     for (const robot of game.robots) drawRobot(robot);
 
     for (const particle of game.particles) {
+      ctx.save();
       ctx.globalAlpha = clamp(particle.life * 1.6, 0, 1);
       ctx.fillStyle = particle.color;
-      ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
-      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.beginPath();
+      ctx.arc(particle.x - particle.size * 0.3, particle.y - particle.size * 0.3, particle.size * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
     for (const item of game.floats) {
+      ctx.save();
       ctx.globalAlpha = clamp(item.life, 0, 1);
-      ctx.fillStyle = item.color;
-      ctx.font = '700 15px "Segoe UI", system-ui, sans-serif';
+      ctx.font = '800 16px "Trebuchet MS", system-ui, sans-serif';
       ctx.textAlign = 'center';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = COLORS.cream;
+      ctx.strokeText(item.text, item.x, item.y);
+      ctx.fillStyle = item.color;
       ctx.fillText(item.text, item.x, item.y);
       ctx.textAlign = 'left';
-      ctx.globalAlpha = 1;
+      ctx.restore();
     }
 
     if (game.messageTimer > 0 && game.message) {
-      ctx.font = '600 13px "Segoe UI", system-ui, sans-serif';
-      const width = ctx.measureText(game.message).width + 28;
-      ctx.fillStyle = 'rgba(11, 18, 32, 0.9)';
-      roundedRect(W / 2 - width / 2, 14, width, 30, 10);
+      ctx.save();
+      ctx.font = '800 14px "Trebuchet MS", system-ui, sans-serif';
+      const width = ctx.measureText(game.message).width + 40;
+      const x = W / 2 - width / 2;
+      ctx.fillStyle = 'rgba(34, 48, 74, 0.2)';
+      roundedRect(x + 3, 17, width, 34, 13);
       ctx.fill();
+      ctx.beginPath();
+      roundedRect(x, 12, width, 34, 13);
+      ctx.fillStyle = COLORS.cream;
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.stroke();
       ctx.fillStyle = COLORS.amber;
+      ctx.beginPath();
+      ctx.arc(x + 16, 29, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.stroke();
+      ctx.fillStyle = COLORS.ink;
       ctx.textAlign = 'center';
-      ctx.fillText(game.message, W / 2, 34);
+      ctx.fillText(game.message, W / 2 + 8, 35);
       ctx.textAlign = 'left';
+      ctx.restore();
     }
 
     if (game.paused && !game.over) {
-      ctx.fillStyle = 'rgba(6, 11, 22, 0.6)';
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
       ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = COLORS.text;
-      ctx.font = '700 26px "Segoe UI", system-ui, sans-serif';
+      ctx.font = '800 34px "Trebuchet MS", system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Пауза', W / 2, H / 2);
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = COLORS.cream;
+      ctx.strokeText('ПАУЗА', W / 2, H / 2);
+      ctx.fillStyle = COLORS.ink;
+      ctx.fillText('ПАУЗА', W / 2, H / 2);
       ctx.textAlign = 'left';
+      ctx.restore();
     }
   }
 
