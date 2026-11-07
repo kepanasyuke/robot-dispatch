@@ -7,6 +7,17 @@
 *Восемь кадров одного сценария: задача создаётся, робот её берёт и замолкает — lease истекает,
 задача возвращается в очередь, второй робот доводит её до успеха. GIF собирается командой `make docs`.*
 
+<p align="center">
+  <a href="https://kepanasyuke.github.io/robot-dispatch/dispatch/"><b>▶ Открыть демо-консоль</b></a>
+  ·
+  <a href="https://kepanasyuke.github.io/robot-dispatch/">Покрытие тестами</a>
+  ·
+  <a href="https://kepanasyuke.github.io/robot-dispatch/game/">Игра «Диспетчер роботов»</a>
+</p>
+
+Демо-консоль работает без бэкенда: данные лежат в памяти браузера, создание и отмена
+задач доступны сразу после входа.
+
 ## Простыми словами
 
 Это диспетчерская для парка роботов: складская система присылает задачи, диспетчер раздаёт их роботам, собирает телеметрию и показывает, что происходит с флотом. Если робот потерял связь, его задача возвращается в очередь и достаётся другому — работа не встаёт.
@@ -28,14 +39,15 @@
 
 | Проект | Что демонстрирует | Стек | Тесты |
 |---|---|---|---|
-| [robot-dispatch](src/robot_dispatch) | диспетчеризация: очередь задач, lease-восстановление, транзакционный outbox, REST API | FastAPI, PostgreSQL, RabbitMQ, Redis | 70 |
+| [robot-dispatch](src/robot_dispatch) | диспетчеризация: очередь задач, lease-восстановление, транзакционный outbox, REST API | FastAPI, PostgreSQL, RabbitMQ, Redis | 139 |
 | [telemetry-hub](projects/telemetry-hub) | ingest MQTT с дедупликацией, порядком и backpressure, rolling-агрегаты | FastAPI, pydantic, aio-pika (MQTT) | 23 |
 | [ros2-bridge](projects/ros2-bridge) | контракт сервер ↔ ROS2: топики, нормализация единиц, дедуп команд, таймауты фидбэка | pydantic, asyncio | 22 |
 | [grpc-fleet-api](projects/grpc-fleet-api) | gRPC-плоскость: канонические статус-коды, идемпотентный `DispatchTask`, интерцептор метрик | grpcio, protobuf | 15 |
 | [fleet-monitor](projects/fleet-monitor) | правила алертов с гистерезисом, жизненный цикл open/acked/resolved, Prometheus | FastAPI, Prometheus text | 21 |
 | [wms-integration](projects/wms-integration) | устойчивый HTTP-клиент (retry, circuit breaker), идемпотентный синк заказов, подписанные вебхуки | httpx, HMAC | 22 |
 
-Суммарно: **165 тестов**, `ruff` и `mypy` без замечаний, CI на каждый push.
+Суммарно: **313 python-тестов**, **322 теста веб-консоли**, **40 E2E**;
+`ruff` и `mypy` без замечаний, CI на каждый push.
 
 ## Игра
 
@@ -102,11 +114,82 @@ python scripts/dev.py projects
 Подробности — в коде: `src/robot_dispatch/services/dispatcher.py`,
 `src/robot_dispatch/messaging/outbox_relay.py`, `src/robot_dispatch/domain/state_machine.py`.
 
+## Веб-консоль флота (`web/`)
+
+Отдельное SPA поверх существующего API: очередь задач с фильтрами, карточка задачи с
+полной историей событий, парк роботов и состояние сервиса. Бэкенд не менялся, кроме
+одной правки валидации: `type` из одних пробелов теперь отклоняется, а не превращается
+в пустую строку.
+
+<p align="center"><img src="docs/demo.gif" alt="Консоль: фильтры задач, карточка с историей, отмена задачи" width="880"></p>
+
+| Обзор | Задачи |
+| --- | --- |
+| ![Обзор](docs/screens/01-dashboard.png) | ![Задачи](docs/screens/02-tasks.png) |
+| **Карточка задачи** | **Роботы** |
+| ![Карточка](docs/screens/03-task-detail.png) | ![Роботы](docs/screens/04-robots.png) |
+| **Вход и роли** | **Новая задача** |
+| ![Вход](docs/screens/05-login.png) | ![Новая задача](docs/screens/06-create-task.png) |
+
+Что важно в реализации:
+
+- **Вход и роли.** На старте — экран входа: `X-API-Key` (можно оставить пустым, если сервер
+  без ключа) и роль. «Оператор» создаёт и отменяет задачи, «наблюдатель» только смотрит:
+  кнопки заблокированы с подсказкой причины. Ключ живёт в `sessionStorage` вкладки.
+- **Создание задачи из интерфейса.** Форма с типом, приоритетом, payload (JSON проверяется
+  до отправки), лимитами и `Idempotency-Key`: повторная отправка того же ключа возвращает
+  существующую задачу, а не дубль.
+- **Ошибки не теряются.** `ApiError` отличает сетевой сбой (`status = 0`) от ответа сервиса;
+  `detail` из FastAPI (строка или список полей валидации) превращается в читаемый текст,
+  а страница показывает баннер с кнопкой «Повторить» вместо пустого экрана.
+- **Живые данные.** Опрос раз в 3 секунды с отменой запроса при размонтировании;
+  отдельно запрашиваются `/health/live` и `/health/ready`, и «деградация» — это не «упало».
+- **Чистая логика отдельно от React.** Форматирование, фильтры, сортировка, схлопывание
+  истории, права по роли и сводка по флоту живут в `web/src/lib/*` и покрыты тестами без браузера.
+- **Демо без бэкенда.** `npm run build:demo` собирает консоль с in-memory API на фикстурах:
+  страница `…/dispatch/` показывает рабочий интерфейс без PostgreSQL и RabbitMQ.
+
+Запуск:
+
+```bash
+# 1. бэкенд (нужны postgres/rabbitmq) — или mock для демо
+docker compose up -d
+cd web && npm install && npm run dev        # http://localhost:5173
+
+# 2. демо без бэкенда: mock-API на фикстурах
+npm run mock-api                            # http://127.0.0.1:8787/api/v1
+VITE_API_BASE=http://127.0.0.1:8787/api/v1 npm run build && npm run preview
+```
+
+Проверки:
+
+```bash
+cd web
+npm run typecheck      # tsc --noEmit
+npm run test           # 322 unit и компонентных тестов (vitest + jsdom)
+npm run test:coverage  # HTML-отчёт v8 в web/coverage
+npm run e2e            # 40 сценариев Playwright на mock-API
+```
+
+Покрытие: `python -m pytest tests projects --cov=src/robot_dispatch --cov-report=json:coverage-python.json`
+и `npm run test:coverage`, затем `python scripts/build_coverage_site.py` — собирает
+`coverage-site/index.html` со сводкой по обоим наборам и ссылками на полные отчёты.
+Сейчас: **Python 92,8 %**, **TypeScript 97,9 %**. Самая слабая зона — точки входа
+воркеров (`workers/*main`, запускаются только в контейнере) и `repositories/memory.py`
+на редких ветках; они помечены в отчёте, а не спрятаны. Публикация — workflow
+`.github/workflows/coverage.yml` (GitHub Pages).
+
+Ограничения: консоль только читает и отменяет задачи — создание доступно через API;
+WebSocket-обновлений нет, поэтому задержка до 3 секунд; mock-API не заменяет
+интеграционный прогон с PostgreSQL и RabbitMQ.
+
 ## Структура
 
 ```
 src/robot_dispatch/        основной сервис диспетчеризации
   api/  db/  domain/  repositories/  services/  messaging/  workers/  infra/
+web/                       веб-консоль (Vite + React + TS), mock-API и E2E
+coverage-site/             сводный отчёт покрытия (собирается скриптом)
 mock_ros2/                 симулятор флота (регистрация, команды, прогресс, heartbeat)
 projects/
   telemetry-hub/           ingest и агрегаты телеметрии

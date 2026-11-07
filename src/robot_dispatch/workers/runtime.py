@@ -42,10 +42,10 @@ async def runtime(settings: Settings):
 
     try:
         async with uow_factory() as uow:
-            robots = await uow.robots.list()
-        for robot in robots:
-            await broker.ensure_robot_queue(robot.id)
-        logger.info("robot queues ensured", count=len(robots))
+            robot_ids = [robot.id for robot in await uow.robots.list()]
+        for robot_id in robot_ids:
+            await broker.ensure_robot_queue(robot_id)
+        logger.info("robot queues ensured", count=len(robot_ids))
     except Exception as exc:  # noqa: BLE001 - schema may not be migrated yet
         logger.warning("cannot pre-declare robot queues", error=str(exc))
 

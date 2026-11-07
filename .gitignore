@@ -16,3 +16,7 @@ htmlcov/
 *.sqlite3
 .idea/
 .vscode/
+coverage-python/
+coverage-python.json
+coverage-site/
+docs/frames/

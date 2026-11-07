@@ -26,7 +26,10 @@ class TaskCreateRequest(BaseModel):
     @field_validator("type")
     @classmethod
     def _normalize_type(cls, value: str) -> str:
-        return value.strip().lower()
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("type must not be blank")
+        return normalized
 
     @field_validator("external_id")
     @classmethod

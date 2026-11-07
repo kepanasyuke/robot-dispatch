@@ -1,0 +1,98 @@
+name: coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: install python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" pytest-cov aiosqlite
+
+      - name: pytest with coverage
+        run: |
+          python -m pytest tests projects -q \
+            --cov=src/robot_dispatch \
+            --cov-report=json:coverage-python.json \
+            --cov-report=html:coverage-python
+
+      - name: install web deps
+        working-directory: web
+        run: npm ci
+
+      - name: vitest with coverage
+        working-directory: web
+        run: npm run test:coverage
+
+      - name: typecheck web
+        working-directory: web
+        run: npm run typecheck
+
+      - name: install playwright
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: build web for e2e
+        working-directory: web
+        env:
+          VITE_API_BASE: http://127.0.0.1:8787/api/v1
+        run: npm run build
+
+      - name: e2e
+        working-directory: web
+        run: npx playwright test
+
+      - name: build demo console
+        working-directory: web
+        run: npm run build:demo
+
+      - name: build coverage site
+        run: python scripts/build_coverage_site.py
+
+      - name: keep existing pages (game, diagrams)
+        run: |
+          cp -r docs coverage-site/docs
+          cp -r docs/game coverage-site/game
+          cp -r web/demo-dist coverage-site/dispatch
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: coverage-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
