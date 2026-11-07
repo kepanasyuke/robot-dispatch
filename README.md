@@ -35,7 +35,7 @@
 | [fleet-monitor](projects/fleet-monitor) | правила алертов с гистерезисом, жизненный цикл open/acked/resolved, Prometheus | FastAPI, Prometheus text | 21 |
 | [wms-integration](projects/wms-integration) | устойчивый HTTP-клиент (retry, circuit breaker), идемпотентный синк заказов, подписанные вебхуки | httpx, HMAC | 22 |
 
-Суммарно: **313 python-тестов**, **266 тестов веб-консоли**, **30 E2E**;
+Суммарно: **313 python-тестов**, **322 теста веб-консоли**, **40 E2E**;
 `ruff` и `mypy` без замечаний, CI на каждый push.
 
 ## Игра
@@ -117,16 +117,26 @@ python scripts/dev.py projects
 | ![Обзор](docs/screens/01-dashboard.png) | ![Задачи](docs/screens/02-tasks.png) |
 | **Карточка задачи** | **Роботы** |
 | ![Карточка](docs/screens/03-task-detail.png) | ![Роботы](docs/screens/04-robots.png) |
+| **Вход и роли** | **Новая задача** |
+| ![Вход](docs/screens/05-login.png) | ![Новая задача](docs/screens/06-create-task.png) |
 
 Что важно в реализации:
 
+- **Вход и роли.** На старте — экран входа: `X-API-Key` (можно оставить пустым, если сервер
+  без ключа) и роль. «Оператор» создаёт и отменяет задачи, «наблюдатель» только смотрит:
+  кнопки заблокированы с подсказкой причины. Ключ живёт в `sessionStorage` вкладки.
+- **Создание задачи из интерфейса.** Форма с типом, приоритетом, payload (JSON проверяется
+  до отправки), лимитами и `Idempotency-Key`: повторная отправка того же ключа возвращает
+  существующую задачу, а не дубль.
 - **Ошибки не теряются.** `ApiError` отличает сетевой сбой (`status = 0`) от ответа сервиса;
   `detail` из FastAPI (строка или список полей валидации) превращается в читаемый текст,
   а страница показывает баннер с кнопкой «Повторить» вместо пустого экрана.
 - **Живые данные.** Опрос раз в 3 секунды с отменой запроса при размонтировании;
   отдельно запрашиваются `/health/live` и `/health/ready`, и «деградация» — это не «упало».
 - **Чистая логика отдельно от React.** Форматирование, фильтры, сортировка, схлопывание
-  истории и сводка по флоту живут в `web/src/lib/*` и покрыты тестами без браузера.
+  истории, права по роли и сводка по флоту живут в `web/src/lib/*` и покрыты тестами без браузера.
+- **Демо без бэкенда.** `npm run build:demo` собирает консоль с in-memory API на фикстурах:
+  страница `…/dispatch/` показывает рабочий интерфейс без PostgreSQL и RabbitMQ.
 
 Запуск:
 
@@ -145,15 +155,15 @@ VITE_API_BASE=http://127.0.0.1:8787/api/v1 npm run build && npm run preview
 ```bash
 cd web
 npm run typecheck      # tsc --noEmit
-npm run test           # 266 unit и компонентных тестов (vitest + jsdom)
+npm run test           # 322 unit и компонентных тестов (vitest + jsdom)
 npm run test:coverage  # HTML-отчёт v8 в web/coverage
-npm run e2e            # 30 сценариев Playwright на mock-API
+npm run e2e            # 40 сценариев Playwright на mock-API
 ```
 
 Покрытие: `python -m pytest tests projects --cov=src/robot_dispatch --cov-report=json:coverage-python.json`
 и `npm run test:coverage`, затем `python scripts/build_coverage_site.py` — собирает
 `coverage-site/index.html` со сводкой по обоим наборам и ссылками на полные отчёты.
-Сейчас: **Python 92,8 %**, **TypeScript 98,9 %**. Самая слабая зона — точки входа
+Сейчас: **Python 92,8 %**, **TypeScript 97,9 %**. Самая слабая зона — точки входа
 воркеров (`workers/*main`, запускаются только в контейнере) и `repositories/memory.py`
 на редких ветках; они помечены в отчёте, а не спрятаны. Публикация — workflow
 `.github/workflows/coverage.yml` (GitHub Pages).

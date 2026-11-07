@@ -70,6 +70,10 @@ jobs:
         working-directory: web
         run: npx playwright test
 
+      - name: build demo console
+        working-directory: web
+        run: npm run build:demo
+
       - name: build coverage site
         run: python scripts/build_coverage_site.py
 
@@ -77,6 +81,7 @@ jobs:
         run: |
           cp -r docs coverage-site/docs
           cp -r docs/game coverage-site/game
+          cp -r web/demo-dist coverage-site/dispatch
 
       - uses: actions/upload-pages-artifact@v3
         with:

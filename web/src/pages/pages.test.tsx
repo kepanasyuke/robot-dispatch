@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { DashboardPage } from "./DashboardPage";
@@ -7,21 +7,25 @@ import { TasksPage } from "./TasksPage";
 import { TaskDetailPage } from "./TaskDetailPage";
 import { RobotsPage } from "./RobotsPage";
 import { ApiContext } from "../hooks/useApi";
+import { RoleContext } from "../auth/RoleContext";
+import type { Role } from "../auth/session";
 import { makeFakeApi, makeStats } from "../test/fakeApi";
 import type { ApiClient } from "../api/client";
 import { makeEvent, makeRobot, makeTask } from "../test/fixtures";
 
-function renderWith(api: ApiClient, ui: React.ReactElement, route = "/") {
+function renderWith(api: ApiClient, ui: React.ReactElement, route = "/", role: Role = "operator") {
   return render(
     <ApiContext.Provider value={api}>
-      <MemoryRouter initialEntries={[route]}>
-        <Routes>
-          <Route path="/" element={ui} />
-          <Route path="/tasks" element={ui} />
-          <Route path="/tasks/:taskId" element={ui} />
-          <Route path="/robots" element={ui} />
-        </Routes>
-      </MemoryRouter>
+      <RoleContext.Provider value={role}>
+        <MemoryRouter initialEntries={[route]}>
+          <Routes>
+            <Route path="/" element={ui} />
+            <Route path="/tasks" element={ui} />
+            <Route path="/tasks/:taskId" element={ui} />
+            <Route path="/robots" element={ui} />
+          </Routes>
+        </MemoryRouter>
+      </RoleContext.Provider>
     </ApiContext.Provider>,
   );
 }
@@ -243,5 +247,62 @@ describe("страницы без данных", () => {
 
     expect(screen.getByText("Загрузка задачи…")).toBeInTheDocument();
     vi.restoreAllMocks();
+  });
+});
+
+describe("права по роли", () => {
+  it("наблюдатель не может создать задачу", async () => {
+    const api = makeFakeApi({ tasks });
+    renderWith(api, <TasksPage />, "/tasks", "viewer");
+
+    const button = await screen.findByRole("button", { name: "Новая задача" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("title", expect.stringContaining("Наблюдатель"));
+  });
+
+  it("оператор может создать задачу", async () => {
+    const api = makeFakeApi({ tasks });
+    renderWith(api, <TasksPage />, "/tasks", "operator");
+
+    expect(await screen.findByRole("button", { name: "Новая задача" })).toBeEnabled();
+  });
+
+  it("наблюдателю недоступна отмена задачи", async () => {
+    const pending = makeTask({ id: "t-view", status: "pending" });
+    const api = makeFakeApi({ tasks: [pending] });
+    renderWith(api, <TaskDetailPage />, "/tasks/t-view", "viewer");
+
+    const button = await screen.findByRole("button", { name: "Отменить" });
+    expect(button).toBeDisabled();
+  });
+});
+
+describe("создание задачи из интерфейса", () => {
+  it("открывает форму и отправляет задачу", async () => {
+    const api = makeFakeApi({ tasks });
+    renderWith(api, <TasksPage />, "/tasks");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Новая задача" }));
+    const dialog = screen.getByRole("dialog", { name: "Новая задача" });
+    expect(dialog).toBeInTheDocument();
+
+    await userEvent.type(within(dialog).getByLabelText("Тип"), "patrol");
+    await userEvent.click(screen.getByRole("button", { name: "Создать" }));
+
+    await waitFor(() => expect(api.createTask).toHaveBeenCalledTimes(1));
+    const [input, key] = api.createTask.mock.calls[0] as [Record<string, unknown>, string];
+    expect(input.type).toBe("patrol");
+    expect(typeof key).toBe("string");
+  });
+
+  it("закрывает форму без отправки", async () => {
+    const api = makeFakeApi({ tasks });
+    renderWith(api, <TasksPage />, "/tasks");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Новая задача" }));
+    await userEvent.click(screen.getByRole("button", { name: "Отмена" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(api.createTask).not.toHaveBeenCalled();
   });
 });

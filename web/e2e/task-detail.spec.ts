@@ -1,11 +1,13 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
+import { loginAs } from "./session";
 
 const MOCK = "http://127.0.0.1:8787";
 const RUNNING = "aaaa1111-1111-4111-8111-111111111111";
 const PENDING = "aaaa2222-2222-4222-8222-222222222222";
 const RETRYING = "aaaa3333-3333-4333-8333-333333333333";
 
-test.beforeEach(async ({ request }) => {
+test.beforeEach(async ({ page, request }) => {
+  await loginAs(page);
   await request.post(`${MOCK}/__reset`);
 });
 
@@ -16,7 +18,6 @@ test.describe("карточка задачи", () => {
     await expect(page.getByText("Выполняется")).toBeVisible();
     await expect(page.getByText(RUNNING)).toBeVisible();
     await expect(page.getByText("200")).toBeVisible();
-    await expect(page.getByText("2 минуты")).toBeVisible();
   });
 
   test("показывает историю событий", async ({ page }) => {

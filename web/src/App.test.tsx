@@ -1,51 +1,84 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "./App";
-import { ApiContext, useApi } from "./hooks/useApi";
+import { clearSession, loadSession, saveSession } from "./auth/session";
 import { makeFakeApi } from "./test/fakeApi";
 import { makeTask } from "./test/fixtures";
 
 function renderApp() {
   const api = makeFakeApi({ tasks: [makeTask({ type: "delivery" })] });
-  render(
-    <ApiContext.Provider value={api}>
-      <App />
-    </ApiContext.Provider>,
-  );
+  render(<App clientFactory={() => api} />);
   return api;
 }
 
-describe("useApi", () => {
-  it("падает без провайдера", () => {
-    const Probe = () => {
-      useApi();
-      return null;
-    };
-    expect(() => render(<Probe />)).toThrow("ApiContext is not provided");
+async function login(role: "operator" | "viewer" = "operator") {
+  if (role === "viewer") {
+    await userEvent.click(screen.getByLabelText(/Наблюдатель/));
+  }
+  await userEvent.click(screen.getByRole("button", { name: "Войти" }));
+}
+
+describe("App: вход", () => {
+  beforeEach(() => {
+    clearSession();
+    window.location.hash = "";
   });
 
-  it("возвращает клиента из провайдера", () => {
-    const api = makeFakeApi();
-    const Probe = () => {
-      const client = useApi();
-      return <span>{client.baseUrl}</span>;
-    };
-    render(
-      <ApiContext.Provider value={api}>
-        <Probe />
-      </ApiContext.Provider>,
-    );
-    expect(screen.getByText("http://fake/api/v1")).toBeInTheDocument();
+  it("начинает с экрана входа", () => {
+    renderApp();
+    expect(screen.getByRole("form", { name: "Вход в консоль" })).toBeInTheDocument();
+  });
+
+  it("после входа показывает консоль", async () => {
+    renderApp();
+    await login();
+
+    await waitFor(() => expect(screen.getByText("Robot Dispatch")).toBeInTheDocument());
+    expect(screen.getByText("Задач всего")).toBeInTheDocument();
+  });
+
+  it("сохраняет сессию в sessionStorage", async () => {
+    renderApp();
+    await login();
+
+    expect(loadSession()).toEqual({ role: "operator", apiKey: "" });
+  });
+
+  it("показывает роль в шапке", async () => {
+    renderApp();
+    await login("viewer");
+
+    expect(await screen.findByText("Наблюдатель")).toBeInTheDocument();
+  });
+
+  it("выход возвращает на экран входа", async () => {
+    renderApp();
+    await login();
+    await userEvent.click(screen.getByRole("button", { name: "Выйти" }));
+
+    expect(await screen.findByRole("form", { name: "Вход в консоль" })).toBeInTheDocument();
+    expect(loadSession()).toBeNull();
+  });
+
+  it("восстанавливает сессию из хранилища", async () => {
+    saveSession({ role: "operator", apiKey: "k" });
+    renderApp();
+
+    await waitFor(() => expect(screen.getByText("Оператор")).toBeInTheDocument());
   });
 });
 
-describe("App", () => {
-  it("рисует шапку и обзор", async () => {
+describe("App: навигация", () => {
+  beforeEach(() => {
+    saveSession({ role: "operator", apiKey: "" });
+    window.location.hash = "";
+  });
+
+  it("открывает обзор по умолчанию", async () => {
     renderApp();
-    expect(screen.getByText("Robot Dispatch")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Обзор" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Задач всего")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "Обзор" })).toBeInTheDocument();
   });
 
   it("переходит на вкладку задач", async () => {
@@ -60,9 +93,11 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { name: "Парк роботов" })).toBeInTheDocument();
   });
 
-  it("показывает подвал с источниками", () => {
+  it("показывает подвал с источниками", async () => {
     renderApp();
-    expect(screen.getByText("FastAPI · PostgreSQL · RabbitMQ")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("FastAPI · PostgreSQL · RabbitMQ")).toBeInTheDocument(),
+    );
   });
 
   it("показывает состояние сервиса в шапке", async () => {
@@ -73,14 +108,8 @@ describe("App", () => {
   });
 
   it("показывает 404 для неизвестного маршрута", async () => {
-    const api = makeFakeApi();
     window.location.hash = "#/nope";
-    render(
-      <ApiContext.Provider value={api}>
-        <App />
-      </ApiContext.Provider>,
-    );
+    renderApp();
     expect(await screen.findByText("Страница не найдена")).toBeInTheDocument();
-    vi.restoreAllMocks();
   });
 });

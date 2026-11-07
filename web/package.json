@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:demo": "vite build --mode demo --base=/robot-dispatch/dispatch/ --outDir=demo-dist",
     "preview": "vite preview --port 4173 --strictPort --host 127.0.0.1",
     "test": "vitest run",
     "test:watch": "vitest",

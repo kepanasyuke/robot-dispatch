@@ -9,11 +9,15 @@ import { StatusBadge } from "../components/StatusBadge";
 import { ApiError } from "../api/client";
 import { formatDateTime, formatDuration, formatLease, formatRelative } from "../lib/format";
 import { isTerminalStatus, taskStatusLabel, taskStatusTone } from "../lib/status";
+import { canCancelTasks, denyReason } from "../lib/permissions";
+import { useRole } from "../auth/RoleContext";
 import { countIgnoredResults, countRetries, executionSeconds, transitionPath } from "../lib/timeline";
 
 export function TaskDetailPage() {
   const { taskId = "" } = useParams();
   const api = useApi();
+  const role = useRole();
+  const allowCancel = canCancelTasks(role);
   const task = useResource(() => api.getTask(taskId), [taskId], 3000);
   const events = useResource(() => api.getTaskEvents(taskId), [taskId], 3000);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -78,7 +82,8 @@ export function TaskDetailPage() {
           <button
             type="button"
             className="button button--danger"
-            disabled={busy || isTerminalStatus(current.status)}
+            disabled={busy || isTerminalStatus(current.status) || !allowCancel}
+            title={allowCancel ? "Отменить задачу" : denyReason(role)}
             onClick={() => void cancel()}
           >
             {isTerminalStatus(current.status) ? "Завершена" : busy ? "Отменяем…" : "Отменить"}

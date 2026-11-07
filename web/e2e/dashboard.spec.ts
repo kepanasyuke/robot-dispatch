@@ -1,8 +1,10 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
+import { loginAs } from "./session";
 
 const MOCK = "http://127.0.0.1:8787";
 
-test.beforeEach(async ({ request }) => {
+test.beforeEach(async ({ page, request }) => {
+  await loginAs(page);
   const response = await request.post(`${MOCK}/__reset`);
   expect(response.ok()).toBeTruthy();
 });

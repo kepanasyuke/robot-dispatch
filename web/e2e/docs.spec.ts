@@ -2,6 +2,7 @@ import { test } from "@playwright/test";
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loginAs } from "./session";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const docs = join(here, "..", "..", "docs");
@@ -18,7 +19,8 @@ test.beforeAll(() => {
   mkdirSync(frames, { recursive: true });
 });
 
-test.beforeEach(async ({ request }) => {
+test.beforeEach(async ({ page, request }) => {
+  await loginAs(page);
   await request.post(`${MOCK}/__reset`);
 });
 
@@ -35,6 +37,18 @@ test("снимки экранов", async ({ page }) => {
     await page.waitForLoadState("networkidle");
     await page.screenshot({ path: join(screens, name), fullPage: true });
   }
+
+  await page.goto("/#/tasks");
+  await page.getByRole("button", { name: "Новая задача" }).click();
+  await page.getByRole("dialog", { name: "Новая задача" }).waitFor();
+  await page.screenshot({ path: join(screens, "06-create-task.png"), fullPage: true });
+  await page.getByRole("button", { name: "Отмена" }).click();
+
+  await page.evaluate(() => window.sessionStorage.clear());
+  await page.goto("/");
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await page.screenshot({ path: join(screens, "05-login.png"), fullPage: true });
 });
 
 test("кадры для гифки", async ({ page }) => {

@@ -4,6 +4,4 @@ coverage/
 playwright-report/
 test-results/
 .env.local
-preview.log
-preview.err
-*.tsbuildinfo
+demo-dist/

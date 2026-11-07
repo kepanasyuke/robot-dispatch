@@ -230,7 +230,7 @@ def main() -> int:
     if WEB_HTML.exists():
         shutil.copytree(WEB_HTML, SITE / "web")
 
-    totals = {"tests": 313 + 266 + 30}
+    totals = {"tests": 313 + 322 + 40}
     (SITE / "index.html").write_text(render(suites, totals), encoding="utf-8")
     summary = {
         "suites": [

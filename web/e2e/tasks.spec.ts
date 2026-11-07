@@ -1,8 +1,10 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
+import { loginAs } from "./session";
 
 const MOCK = "http://127.0.0.1:8787";
 
-test.beforeEach(async ({ request }) => {
+test.beforeEach(async ({ page, request }) => {
+  await loginAs(page);
   await request.post(`${MOCK}/__reset`);
 });
 
@@ -56,7 +58,8 @@ test.describe("список задач", () => {
 
   test("открывает карточку задачи", async ({ page }) => {
     await page.goto("/#/tasks");
-    await page.getByRole("link", { name: "running" }).or(page.getByRole("link", { name: "delivery" })).first().click();
+    await page.getByRole("link", { name: "delivery" }).first().click();
+
     await expect(page).toHaveURL(/#\/tasks\/[0-9a-f-]+/);
     await expect(page.getByText("История событий")).toBeVisible();
   });

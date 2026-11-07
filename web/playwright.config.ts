@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: ["**/docs.spec.ts"],
+  testIgnore: process.env.CAPTURE_DOCS ? [] : ["**/docs.spec.ts"],
   timeout: 30_000,
   expect: { timeout: 7_000 },
   fullyParallel: true,
@@ -13,7 +13,7 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",
-    video: "on",
+    video: "retain-on-failure",
     screenshot: "only-on-failure",
     viewport: { width: 1280, height: 900 },
   },
