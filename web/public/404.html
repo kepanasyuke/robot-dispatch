@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Dispatch — переход</title>
+<script>
+  (function () {
+    var base = "/robot-dispatch/dispatch/";
+    var path = location.pathname.replace(/^\/robot-dispatch\/?/, "").replace(/^dispatch\/?/, "");
+    var route = path ? "#/" + path.replace(/\/+$/, "") : "#/";
+    location.replace(base + route + (location.search || "") + (location.hash || ""));
+  })();
+</script>
+</head>
+<body>
+  <p>Переход к консоли… Если ничего не произошло, откройте
+    <a href="https://kepanasyuke.github.io/robot-dispatch/dispatch/">демо-консоль</a>.</p>
+</body>
+</html>

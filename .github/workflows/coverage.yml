@@ -82,6 +82,7 @@ jobs:
           cp -r docs coverage-site/docs
           cp -r docs/game coverage-site/game
           cp -r web/demo-dist coverage-site/dispatch
+          cp web/demo-dist/404.html coverage-site/404.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
