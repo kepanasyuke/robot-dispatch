@@ -46,7 +46,7 @@
 | [fleet-monitor](projects/fleet-monitor) | правила алертов с гистерезисом, жизненный цикл open/acked/resolved, Prometheus | FastAPI, Prometheus text | 21 |
 | [wms-integration](projects/wms-integration) | устойчивый HTTP-клиент (retry, circuit breaker), идемпотентный синк заказов, подписанные вебхуки | httpx, HMAC | 22 |
 
-Суммарно: **313 python-тестов**, **322 теста веб-консоли**, **40 E2E**;
+Суммарно: **321 python-тест**, **344 теста веб-консоли**, **40 E2E**;
 `ruff` и `mypy` без замечаний, CI на каждый push.
 
 ## Игра
@@ -130,6 +130,8 @@ python scripts/dev.py projects
 | ![Карточка](docs/screens/03-task-detail.png) | ![Роботы](docs/screens/04-robots.png) |
 | **Вход и роли** | **Новая задача** |
 | ![Вход](docs/screens/05-login.png) | ![Новая задача](docs/screens/06-create-task.png) |
+| **Уведомление после создания** | |
+| ![Тост](docs/screens/07-toast.png) | |
 
 Что важно в реализации:
 
@@ -166,7 +168,7 @@ VITE_API_BASE=http://127.0.0.1:8787/api/v1 npm run build && npm run preview
 ```bash
 cd web
 npm run typecheck      # tsc --noEmit
-npm run test           # 322 unit и компонентных тестов (vitest + jsdom)
+npm run test           # 344 unit и компонентных тестов (vitest + jsdom)
 npm run test:coverage  # HTML-отчёт v8 в web/coverage
 npm run e2e            # 40 сценариев Playwright на mock-API
 ```
@@ -174,7 +176,7 @@ npm run e2e            # 40 сценариев Playwright на mock-API
 Покрытие: `python -m pytest tests projects --cov=src/robot_dispatch --cov-report=json:coverage-python.json`
 и `npm run test:coverage`, затем `python scripts/build_coverage_site.py` — собирает
 `coverage-site/index.html` со сводкой по обоим наборам и ссылками на полные отчёты.
-Сейчас: **Python 92,8 %**, **TypeScript 97,9 %**. Самая слабая зона — точки входа
+Сейчас: **Python 95,5 %**, **TypeScript 97,9 %**. Самая слабая зона — точки входа
 воркеров (`workers/*main`, запускаются только в контейнере) и `repositories/memory.py`
 на редких ветках; они помечены в отчёте, а не спрятаны. Публикация — workflow
 `.github/workflows/coverage.yml` (GitHub Pages).

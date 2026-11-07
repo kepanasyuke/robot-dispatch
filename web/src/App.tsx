@@ -10,6 +10,7 @@ import { summarizeHealth } from "./lib/health";
 import { useResource } from "./hooks/useResource";
 import { useApi, ApiContext } from "./hooks/useApi";
 import { RoleContext } from "./auth/RoleContext";
+import { ToastProvider } from "./components/Toasts";
 import { clearSession, loadSession, saveSession, type Session } from "./auth/session";
 import { createApiClient, type ApiClient } from "./api/client";
 import { createDemoClient } from "./demo/demoClient";
@@ -80,9 +81,11 @@ export function App({ clientFactory }: AppProps = {}) {
 
   return (
     <ApiContext.Provider value={client}>
-      <HashRouter>
-        <Shell session={session} onLogout={logout} />
-      </HashRouter>
+      <ToastProvider>
+        <HashRouter>
+          <Shell session={session} onLogout={logout} />
+        </HashRouter>
+      </ToastProvider>
     </ApiContext.Provider>
   );
 }

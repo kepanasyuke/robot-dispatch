@@ -1,15 +1,49 @@
 import { Link } from "react-router-dom";
 import type { Task } from "../api/types";
+import type { SortDirection, SortKey } from "../lib/tasks";
 import { formatDateTime, formatDuration, formatRelative } from "../lib/format";
 import { taskStatusLabel, taskStatusTone } from "../lib/status";
 import { StatusBadge } from "./StatusBadge";
 import { EmptyState } from "./EmptyState";
 
-export function TaskTable({ tasks, now }: { tasks: Task[]; now?: Date }) {
+export interface TaskTableProps {
+  tasks: Task[];
+  now?: Date;
+  sort?: { key: SortKey; dir: SortDirection };
+  onSort?: (key: SortKey) => void;
+}
+
+const COLUMNS: Array<{ key: SortKey; label: string }> = [
+  { key: "priority", label: "Приоритет" },
+  { key: "created", label: "Создана" },
+  { key: "available", label: "Доступна" },
+];
+
+export function TaskTable({ tasks, now, sort, onSort }: TaskTableProps) {
   const reference = now ?? new Date();
 
   if (tasks.length === 0) {
     return <EmptyState title="Задач нет" hint="Измените фильтры или создайте задачу через API." />;
+  }
+
+  function header(label: string, key?: SortKey) {
+    if (!key || !onSort) {
+      return <th scope="col">{label}</th>;
+    }
+    const active = sort?.key === key;
+    const direction = active ? (sort?.dir === "asc" ? "ascending" : "descending") : "none";
+    return (
+      <th scope="col" aria-sort={direction}>
+        <button
+          type="button"
+          className={active ? "th-sort th-sort--active" : "th-sort"}
+          onClick={() => onSort(key)}
+        >
+          {label}
+          <span aria-hidden="true">{active ? (sort?.dir === "asc" ? " ↑" : " ↓") : ""}</span>
+        </button>
+      </th>
+    );
   }
 
   return (
@@ -19,11 +53,11 @@ export function TaskTable({ tasks, now }: { tasks: Task[]; now?: Date }) {
           <tr>
             <th scope="col">Тип</th>
             <th scope="col">Статус</th>
-            <th scope="col">Приоритет</th>
+            {header("Приоритет", "priority")}
             <th scope="col">Попытки</th>
             <th scope="col">Робот</th>
-            <th scope="col">Создана</th>
-            <th scope="col">Обновлена</th>
+            {header("Создана", "created")}
+            {header("Лимит", "available")}
           </tr>
         </thead>
         <tbody>
@@ -45,7 +79,7 @@ export function TaskTable({ tasks, now }: { tasks: Task[]; now?: Date }) {
               </td>
               <td className="mono">{task.robot_id ? task.robot_id.slice(0, 8) : "—"}</td>
               <td title={formatDateTime(task.created_at)}>{formatRelative(task.created_at, reference)}</td>
-              <td>{formatDuration(task.timeout_seconds)} лимит</td>
+              <td>{formatDuration(task.timeout_seconds)}</td>
             </tr>
           ))}
         </tbody>
@@ -53,3 +87,5 @@ export function TaskTable({ tasks, now }: { tasks: Task[]; now?: Date }) {
     </div>
   );
 }
+
+export { COLUMNS };

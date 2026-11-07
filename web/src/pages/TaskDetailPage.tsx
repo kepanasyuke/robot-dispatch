@@ -11,6 +11,7 @@ import { formatDateTime, formatDuration, formatLease, formatRelative } from "../
 import { isTerminalStatus, taskStatusLabel, taskStatusTone } from "../lib/status";
 import { canCancelTasks, denyReason } from "../lib/permissions";
 import { useRole } from "../auth/RoleContext";
+import { useToast } from "../components/Toasts";
 import { countIgnoredResults, countRetries, executionSeconds, transitionPath } from "../lib/timeline";
 
 export function TaskDetailPage() {
@@ -18,6 +19,7 @@ export function TaskDetailPage() {
   const api = useApi();
   const role = useRole();
   const allowCancel = canCancelTasks(role);
+  const toast = useToast();
   const task = useResource(() => api.getTask(taskId), [taskId], 3000);
   const events = useResource(() => api.getTaskEvents(taskId), [taskId], 3000);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -39,6 +41,7 @@ export function TaskDetailPage() {
     setActionError(null);
     try {
       await api.cancelTask(taskId);
+      toast("Задача отменена");
       task.reload();
       events.reload();
     } catch (error) {

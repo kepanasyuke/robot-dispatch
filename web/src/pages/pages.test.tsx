@@ -7,6 +7,7 @@ import { TasksPage } from "./TasksPage";
 import { TaskDetailPage } from "./TaskDetailPage";
 import { RobotsPage } from "./RobotsPage";
 import { ApiContext } from "../hooks/useApi";
+import { ToastProvider } from "../components/Toasts";
 import { RoleContext } from "../auth/RoleContext";
 import type { Role } from "../auth/session";
 import { makeFakeApi, makeStats } from "../test/fakeApi";
@@ -274,6 +275,86 @@ describe("права по роли", () => {
 
     const button = await screen.findByRole("button", { name: "Отменить" });
     expect(button).toBeDisabled();
+  });
+});
+
+describe("создание задачи из интерфейса", () => {
+  it("показывает тост после создания", async () => {
+    const api = makeFakeApi({ tasks });
+    render(
+      <ApiContext.Provider value={api}>
+        <RoleContext.Provider value="operator">
+          <ToastProvider>
+            <MemoryRouter initialEntries={["/tasks"]}>
+              <Routes>
+                <Route path="/tasks" element={<TasksPage />} />
+              </Routes>
+            </MemoryRouter>
+          </ToastProvider>
+        </RoleContext.Provider>
+      </ApiContext.Provider>,
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "Новая задача" }));
+    const dialog = screen.getByRole("dialog", { name: "Новая задача" });
+    await userEvent.type(within(dialog).getByLabelText("Тип"), "patrol");
+    await userEvent.click(screen.getByRole("button", { name: "Создать" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Задача «delivery» создана");
+  });
+});
+
+describe("пагинация и сортировка", () => {
+  const many = Array.from({ length: 30 }, (_, index) =>
+    makeTask({
+      id: `t-${index}`,
+      type: index % 2 === 0 ? "delivery" : "inventory",
+      priority: index,
+      created_at: new Date(Date.UTC(2026, 10, 7, 10, 0, index)).toISOString(),
+    }),
+  );
+
+  it("показывает ограниченную страницу и листает", async () => {
+    const api = makeFakeApi({ tasks: many });
+    renderWith(api, <TasksPage />, "/tasks");
+
+    await waitFor(() => expect(screen.getAllByTestId("task-row")).toHaveLength(25));
+    expect(screen.getByTestId("pager-status")).toHaveTextContent("страница 1");
+    expect(screen.getByRole("button", { name: "Назад" })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Вперёд" }));
+
+    await waitFor(() => expect(screen.getAllByTestId("task-row")).toHaveLength(5));
+    expect(screen.getByTestId("pager-status")).toHaveTextContent("страница 2");
+    expect(screen.getByRole("button", { name: "Вперёд" })).toBeDisabled();
+  });
+
+  it("сбрасывает страницу при смене размера", async () => {
+    const api = makeFakeApi({ tasks: many });
+    renderWith(api, <TasksPage />, "/tasks");
+
+    await waitFor(() => expect(screen.getAllByTestId("task-row")).toHaveLength(25));
+    await userEvent.click(screen.getByRole("button", { name: "Вперёд" }));
+    await waitFor(() => expect(screen.getByTestId("pager-status")).toHaveTextContent("страница 2"));
+
+    await userEvent.selectOptions(screen.getByLabelText("Задач на странице"), "10");
+
+    await waitFor(() => expect(screen.getByTestId("pager-status")).toHaveTextContent("страница 1"));
+    expect(screen.getAllByTestId("task-row")).toHaveLength(10);
+  });
+
+  it("переключает направление сортировки", async () => {
+    const api = makeFakeApi({ tasks: many.slice(0, 3) });
+    renderWith(api, <TasksPage />, "/tasks");
+
+    await waitFor(() => expect(screen.getAllByTestId("task-row")).toHaveLength(3));
+    const priorityHeader = screen.getByRole("button", { name: /Приоритет/ });
+
+    await userEvent.click(priorityHeader);
+    expect(priorityHeader).toHaveTextContent("↓");
+
+    await userEvent.click(priorityHeader);
+    expect(priorityHeader).toHaveTextContent("↑");
   });
 });
 

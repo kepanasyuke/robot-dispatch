@@ -42,7 +42,11 @@ test("снимки экранов", async ({ page }) => {
   await page.getByRole("button", { name: "Новая задача" }).click();
   await page.getByRole("dialog", { name: "Новая задача" }).waitFor();
   await page.screenshot({ path: join(screens, "06-create-task.png"), fullPage: true });
-  await page.getByRole("button", { name: "Отмена" }).click();
+
+  await page.getByRole("dialog").getByLabel("Тип").fill("patrol");
+  await page.getByRole("dialog").getByRole("button", { name: "Создать" }).click();
+  await page.getByRole("status").waitFor();
+  await page.screenshot({ path: join(screens, "07-toast.png"), fullPage: true });
 
   await page.evaluate(() => window.sessionStorage.clear());
   await page.goto("/");

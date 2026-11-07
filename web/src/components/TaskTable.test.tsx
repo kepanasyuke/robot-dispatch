@@ -65,6 +65,47 @@ describe("TaskTable", () => {
   });
 });
 
+describe("TaskTable: сортировка", () => {
+  function renderSortable(
+    onSort = vi.fn(),
+    sort?: { key: "priority" | "created" | "available"; dir: "asc" | "desc" },
+  ) {
+    const view = render(
+      <MemoryRouter>
+        <TaskTable tasks={[makeTask()]} now={now} sort={sort} onSort={onSort} />
+      </MemoryRouter>,
+    );
+    return { onSort, container: view.container };
+  }
+
+  it("вызывает onSort по клику на заголовок", async () => {
+    const { onSort } = renderSortable();
+    await userEvent.click(screen.getByRole("button", { name: /Приоритет/ }));
+    expect(onSort).toHaveBeenCalledWith("priority");
+  });
+
+  it("помечает активную колонку и направление", () => {
+    const { container } = renderSortable(vi.fn(), { key: "created", dir: "asc" });
+    const headers = Array.from(container.querySelectorAll<HTMLTableCellElement>("th"));
+    const created = headers.find((header) => header.textContent?.includes("Создана"));
+    expect(created).toHaveAttribute("aria-sort", "ascending");
+  });
+
+  it("показывает стрелку направления", () => {
+    renderSortable(vi.fn(), { key: "priority", dir: "desc" });
+    expect(screen.getByRole("button", { name: /Приоритет/ })).toHaveTextContent("↓");
+  });
+
+  it("без onSort заголовки остаются текстом", () => {
+    render(
+      <MemoryRouter>
+        <TaskTable tasks={[makeTask()]} now={now} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole("button", { name: /Приоритет/ })).toBeNull();
+  });
+});
+
 describe("TaskTable: взаимодействие", () => {
   it("не падает при клике по ссылке внутри MemoryRouter", async () => {
     renderTable([makeTask({ type: "patrol" })]);

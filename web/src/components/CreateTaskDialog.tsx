@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import type { CreateTaskInput, Task } from "../api/types";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 export interface CreateTaskDialogProps {
   onClose: () => void;
@@ -35,11 +36,9 @@ export function CreateTaskDialog({ onClose, onSubmit }: CreateTaskDialogProps) {
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const typeRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    typeRef.current?.focus();
-  }, []);
+  useFocusTrap(dialogRef, onClose);
 
   const payloadError = useMemo(() => {
     const text = form.payload.trim();
@@ -91,7 +90,7 @@ export function CreateTaskDialog({ onClose, onSubmit }: CreateTaskDialogProps) {
   }
 
   return (
-    <div className="modal" role="dialog" aria-modal="true" aria-label="Новая задача">
+    <div className="modal" role="dialog" aria-modal="true" aria-label="Новая задача" ref={dialogRef} tabIndex={-1}>
       <form className="modal__card" onSubmit={submit}>
         <header className="modal__head">
           <h2>Новая задача</h2>
@@ -103,7 +102,7 @@ export function CreateTaskDialog({ onClose, onSubmit }: CreateTaskDialogProps) {
         <label className="field">
           <span>Тип</span>
           <input
-            ref={typeRef}
+            data-autofocus
             value={form.type}
             placeholder="delivery"
             onChange={(event) => setForm({ ...form, type: event.target.value })}

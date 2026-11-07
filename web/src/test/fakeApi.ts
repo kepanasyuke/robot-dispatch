@@ -33,11 +33,14 @@ export function makeFakeApi(options: FakeApiOptions = {}) {
 
   const client = {
     baseUrl: "http://fake/api/v1",
-    getTasks: vi.fn(async () => {
+    getTasks: vi.fn(async (filters: { type?: string } = {}, page: { limit?: number; offset?: number } = {}) => {
       if (options.failTasks) {
         throw new Error(options.failTasks);
       }
-      return { items: tasks, limit: 200, offset: 0 };
+      const filtered = filters.type ? tasks.filter((task) => task.type === filters.type) : tasks;
+      const offset = page.offset ?? 0;
+      const limit = page.limit ?? 200;
+      return { items: filtered.slice(offset, offset + limit), limit, offset };
     }),
     getTask: vi.fn(async (id: string) => {
       if (options.failTask) {

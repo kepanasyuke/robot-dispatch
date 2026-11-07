@@ -80,6 +80,17 @@ describe("CreateTaskDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("закрывается по Escape", async () => {
+    const { onClose } = setup();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("ставит фокус в поле типа при открытии", () => {
+    setup();
+    expect(screen.getByLabelText("Тип")).toHaveFocus();
+  });
+
   it("позволяет править Idempotency-Key", async () => {
     const { onSubmit } = setup();
     const field = screen.getByLabelText("Idempotency-Key");
