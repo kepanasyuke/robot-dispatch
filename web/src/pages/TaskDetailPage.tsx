@@ -23,7 +23,7 @@ export function TaskDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const eventList = events.data ?? [];
+  const eventList = useMemo(() => events.data ?? [], [events.data]);
   const meta = useMemo(
     () => ({
       retries: countRetries(eventList),

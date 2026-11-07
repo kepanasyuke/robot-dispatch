@@ -76,9 +76,9 @@ describe("TaskTable: взаимодействие", () => {
     const spy = vi.fn();
     render(
       <MemoryRouter>
-        <div onClick={spy}>
+        <button type="button" onClick={spy}>
           <TaskTable tasks={[makeTask()]} now={now} />
-        </div>
+        </button>
       </MemoryRouter>,
     );
     expect(spy).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import type { CreateTaskInput, Task } from "../api/types";
 
@@ -35,6 +35,11 @@ export function CreateTaskDialog({ onClose, onSubmit }: CreateTaskDialogProps) {
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const typeRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    typeRef.current?.focus();
+  }, []);
 
   const payloadError = useMemo(() => {
     const text = form.payload.trim();
@@ -98,7 +103,7 @@ export function CreateTaskDialog({ onClose, onSubmit }: CreateTaskDialogProps) {
         <label className="field">
           <span>Тип</span>
           <input
-            autoFocus
+            ref={typeRef}
             value={form.type}
             placeholder="delivery"
             onChange={(event) => setForm({ ...form, type: event.target.value })}

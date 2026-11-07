@@ -56,6 +56,10 @@ jobs:
         working-directory: web
         run: npm run typecheck
 
+      - name: lint web
+        working-directory: web
+        run: npm run lint
+
       - name: install playwright
         working-directory: web
         run: npx playwright install --with-deps chromium

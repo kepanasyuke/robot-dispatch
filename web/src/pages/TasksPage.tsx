@@ -19,7 +19,7 @@ export function TasksPage() {
   const [creating, setCreating] = useState(false);
   const tasks = useResource(() => api.getTasks({}, { limit: 200 }), [], 3000);
 
-  const items = tasks.data?.items ?? [];
+  const items = useMemo(() => tasks.data?.items ?? [], [tasks.data]);
   const types = useMemo(() => distinctTypes(items), [items]);
   const visible = useMemo(() => sortTasks(filterTasks(items, filters), "created", "desc"), [items, filters]);
   const allowCreate = canCreateTasks(role);

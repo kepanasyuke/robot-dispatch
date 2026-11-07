@@ -11,7 +11,7 @@ import { robotStatusLabel } from "../lib/status";
 export function RobotsPage() {
   const api = useApi();
   const robots = useResource(() => api.getRobots(), [], 5000);
-  const items = robots.data ?? [];
+  const items = useMemo(() => robots.data ?? [], [robots.data]);
   const fleet = useMemo(() => robotAvailability(items), [items]);
   const stale = useMemo(() => staleRobots(items), [items]);
 

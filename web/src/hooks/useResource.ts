@@ -16,6 +16,12 @@ export function useResource<T>(loader: () => Promise<T>, deps: unknown[], interv
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [nonce, setNonce] = useState(0);
   const alive = useRef(true);
+  const depsKey = JSON.stringify(deps);
+  const loaderRef = useRef(loader);
+
+  useEffect(() => {
+    loaderRef.current = loader;
+  });
 
   const reload = useCallback(() => {
     setNonce((value) => value + 1);
@@ -28,7 +34,7 @@ export function useResource<T>(loader: () => Promise<T>, deps: unknown[], interv
     async function run() {
       setLoading(true);
       try {
-        const result = await loader();
+        const result = await loaderRef.current();
         if (cancelled) {
           return;
         }
@@ -73,8 +79,7 @@ export function useResource<T>(loader: () => Promise<T>, deps: unknown[], interv
       alive.current = false;
       clearInterval(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, intervalMs, nonce]);
+  }, [depsKey, intervalMs, nonce]);
 
   return { data, error, loading, reload, updatedAt };
 }

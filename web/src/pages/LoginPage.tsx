@@ -30,37 +30,40 @@ export function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) 
 
         <fieldset className="login__roles">
           <legend>Роль</legend>
-          <label className={role === "operator" ? "role role--active" : "role"}>
+          <div className={role === "operator" ? "role role--active" : "role"}>
             <input
+              id="role-operator"
               type="radio"
               name="role"
               value="operator"
               checked={role === "operator"}
               onChange={() => setRole("operator")}
             />
-            <span>
+            <label htmlFor="role-operator">
               <strong>Оператор</strong>
               <small>создавать и отменять задачи</small>
-            </span>
-          </label>
-          <label className={role === "viewer" ? "role role--active" : "role"}>
+            </label>
+          </div>
+          <div className={role === "viewer" ? "role role--active" : "role"}>
             <input
+              id="role-viewer"
               type="radio"
               name="role"
               value="viewer"
               checked={role === "viewer"}
               onChange={() => setRole("viewer")}
             />
-            <span>
+            <label htmlFor="role-viewer">
               <strong>Наблюдатель</strong>
               <small>только просмотр</small>
-            </span>
-          </label>
+            </label>
+          </div>
         </fieldset>
 
-        <label className="field">
+        <label className="field" htmlFor="api-key">
           <span>Ключ доступа (X-API-Key)</span>
           <input
+            id="api-key"
             type="password"
             autoComplete="off"
             placeholder="оставьте пустым, если сервер без ключа"
